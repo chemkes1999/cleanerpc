@@ -162,17 +162,48 @@ class HorizontalBarBreakdown(tk.Frame):
         "browser_edge": "#06B6D4",         # Cian
         "browser_brave": "#F97316",        # Naranja
         "browser_firefox": "#EC4899",      # Rosa / Magenta
-        "crash_dumps": "#EF4444",          # Rojo
+        "browser_opera": "#EF4444",        # Rojo Opera
+        "browser_vivaldi": "#F43F5E",      # Frambuesa Vivaldi
+        "app_discord": "#5865F2",          # Blurple Discord
+        "app_spotify": "#1DB954",          # Verde Spotify
+        "app_vscode": "#007ACC",           # Azul VS Code
+        "crash_dumps": "#DC2626",          # Rojo oscuro
         "thumbnail_cache": "#8B5CF6",      # Violeta
         "windows_update_cache": "#14B8A6", # Teal
+        "windows_delivery_opt": "#0EA5E9", # Sky Blue
+        "windows_logs": "#D97706",         # Ámbar oscuro
         "prefetch": "#A855F7"              # Púrpura
     }
 
     def __init__(self, parent, bg_color="#1B1E2B", **kwargs):
         super().__init__(parent, bg=bg_color, **kwargs)
         self.bg_color = bg_color
-        self.rows_frame = tk.Frame(self, bg=self.bg_color)
-        self.rows_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Canvas con scroll vertical para cuando hay muchas categorías
+        self.canvas = tk.Canvas(self, bg=self.bg_color, highlightthickness=0)
+        self.scrollbar = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.canvas.yview)
+        self.rows_frame = tk.Frame(self.canvas, bg=self.bg_color)
+
+        self.rows_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        )
+        self.canvas_window = self.canvas.create_window((0, 0), window=self.rows_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        self.canvas.bind(
+            "<Configure>",
+            lambda e: self.canvas.itemconfig(self.canvas_window, width=e.width)
+        )
+
+        def _on_mousewheel(event):
+            self.canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        self.canvas.bind("<MouseWheel>", _on_mousewheel)
+        self.rows_frame.bind("<MouseWheel>", _on_mousewheel)
+
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
         self.show_placeholder("Presiona 'Escanear Archivos Basura' para generar el gráfico.")
 
     def show_placeholder(self, text):
@@ -212,7 +243,6 @@ class HorizontalBarBreakdown(tk.Frame):
             cat_name = item.get("name", "")
             cat_size = item.get("size", 0)
             size_str = item.get("size_str", "0 B")
-            count = item.get("count", 0)
             color = self.CATEGORY_COLORS.get(cat_key, "#3B82F6")
 
             pct_total = (cat_size / total_size * 100.0) if total_size > 0 else 0.0
@@ -234,7 +264,7 @@ class HorizontalBarBreakdown(tk.Frame):
             lbl_name.pack(side=tk.LEFT)
 
             # Canvas con barra de progreso visual
-            canvas_w = 260
+            canvas_w = 230
             canvas_h = 14
             c = tk.Canvas(row, width=canvas_w, height=canvas_h, bg="#12141D", highlightthickness=0)
             c.pack(side=tk.LEFT, padx=8)
