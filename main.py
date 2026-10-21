@@ -152,8 +152,18 @@ def run_cli(args):
         print(f"   Archivos eliminados: {total_deleted:,} | Omitidos (bloqueados o recientes): {total_skipped:,}\n")
 
 
+def run_modern_gui():
+    """Lanza la interfaz gráfica moderna impulsada por PyWebView + GSAP."""
+    try:
+        from web_gui import run_web_gui
+        run_web_gui()
+    except Exception as e:
+        print(f"[!] Aviso: No se pudo iniciar la interfaz web GSAP ({e}). Iniciando interfaz clásica Tkinter...")
+        run_gui()
+
+
 def run_gui():
-    """Lanza la interfaz gráfica moderna."""
+    """Lanza la interfaz gráfica clásica en Tkinter."""
     import tkinter as tk
     from gui import PyCleanGUI
 
@@ -167,7 +177,8 @@ def main():
         description="PyClean Pro v2.0 - Suite de limpieza y optimización para Windows",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Ejemplos:\n"
-               "  python main.py              (Abre la interfaz gráfica moderna)\n"
+               "  python main.py              (Abre la interfaz moderna animada con GSAP)\n"
+               "  python main.py --legacy-gui (Abre la interfaz gráfica clásica de Tkinter)\n"
                "  python main.py --scan       (Analiza el espacio basura sin borrar nada)\n"
                "  python main.py --clean      (Limpia los archivos basura directamente)\n"
                "  python main.py --startup    (Lista los programas de inicio en consola)\n"
@@ -186,13 +197,16 @@ def main():
     parser.add_argument("--json", action="store_true", help="Emitir resultados en formato JSON estructurado")
     parser.add_argument("--all", action="store_true", help="Ejecutar escaneo, limpieza, optimización de RAM y DNS")
     parser.add_argument("--cli", action="store_true", help="Forzar modo consola interactivo")
+    parser.add_argument("--legacy-gui", action="store_true", help="Abrir la interfaz clásica basada en Tkinter")
 
     args = parser.parse_args()
 
-    if args.scan or args.clean or args.dry_run or args.ram or args.dns or args.startup or args.all or args.cli or args.json:
+    if args.legacy_gui:
+        run_gui()
+    elif args.scan or args.clean or args.dry_run or args.ram or args.dns or args.startup or args.all or args.cli or args.json:
         run_cli(args)
     else:
-        run_gui()
+        run_modern_gui()
 
 
 if __name__ == "__main__":

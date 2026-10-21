@@ -18,6 +18,11 @@ if %errorlevel% equ 0 (
     goto :found
 )
 
+if exist "%LOCALAPPDATA%\Python\pythoncore-3.14-64\python.exe" (
+    set "PYTHON_EXE=%LOCALAPPDATA%\Python\pythoncore-3.14-64\python.exe"
+    goto :found
+)
+
 if exist "%LOCALAPPDATA%\Python\bin\python.exe" (
     set "PYTHON_EXE=%LOCALAPPDATA%\Python\bin\python.exe"
     goto :found

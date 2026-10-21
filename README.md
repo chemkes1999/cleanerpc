@@ -27,10 +27,15 @@ Una aplicación moderna, rápida y segura desarrollada en Python para analizar, 
 
 ---
 
-### 2. Dashboard Gráfico Interactivo (Canvas Nativo)
-- **Soporte Multi-Disco:** Selector dinámico de unidades (`C:\`, `D:\`, etc.) en el gráfico Donut con estadísticas en gigabytes y porcentaje en tiempo real.
-- **Gráfico Donut de Memoria RAM:** Visualización inmediata de memoria en uso frente a memoria disponible.
-- **Gráfico de Barras Proporcional con Scroll:** Desglose visual por categoría con barras de progreso y colores temáticos exclusivos.
+### 2. Dashboard Gráfico Interactivo y Moderno (Animaciones GSAP + PyWebView)
+- **Interfaz Moderna con GSAP (GreenSock Animation Platform):**
+  - Gráficos SVG circulares animados con easing dinámico para Disco y Memoria RAM.
+  - Contadores de bytes y archivos animados en tiempo real (`0 B` -> `XX.XX GB`).
+  - Transiciones suaves entre pestañas y animaciones de entrada fluidas.
+  - Barra de progreso interactiva con efecto de resplandor.
+  - Consola de logs integrada y colapsable con auto-scroll y etiquetas de colores.
+- **Soporte Multi-Disco:** Selector dinámico de unidades (`C:\`, `D:\`, etc.) con estadísticas en gigabytes y porcentaje en tiempo real.
+- **Compatibilidad Dual:** Incluye tanto la interfaz moderna con GSAP como la interfaz gráfica clásica en Tkinter (`--legacy-gui`).
 
 ---
 
