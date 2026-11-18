@@ -1,10 +1,18 @@
-# ⚡ PyClean Pro v2.3 - Suite Integral de Optimización, Mantenimiento y Privacidad para Windows
+# ⚡ PyClean Pro v2.4 - Suite Integral de Optimización, Hardware, Red y Privacidad para Windows
 
-Una aplicación profesional, moderna, rápida y segura desarrollada en Python para analizar y limpiar archivos residuales, auditar y desinstalar aplicaciones sin dejar restos huérfanos, explorar visualmente particiones y carpetas con Treemap interactivo, cazar archivos gigantes, programar mantenimientos automáticos con Windows Task Scheduler, mitigar la telemetría del sistema, triturar archivos confidenciales de forma irrecuperable y optimizar el rendimiento del sistema operativo.
+Una aplicación profesional, moderna, rápida y segura desarrollada en Python para analizar y limpiar archivos residuales, explorar visualmente particiones y carpetas con Treemap interactivo, monitorear procesos/red/DNS en tiempo real, auditar salud S.M.A.R.T. de SSDs y desgaste de batería, gestionar el menú contextual de Windows, almacenar credenciales en una bóveda local cifrada AES-256-GCM y optimizar el rendimiento del sistema operativo.
 
 ---
 
 ## 🚀 Novedades y Características Principales
+
+### 0. 🔥 Suite Avanzada (Nuevo en v2.4)
+- **📊 Monitor de Procesos y Red (`sys_monitor.py`):** Top procesos por RAM/CPU con protección de procesos críticos de Windows, selector rápido de DNS (Cloudflare, Google, AdGuard, DHCP) y prueba de latencia (ping).
+- **🩺 Salud de Hardware (`hardware_health.py`):** Estado S.M.A.R.T. de discos físicos (SSD/HDD/NVMe), botón de optimización **TRIM** nativo y análisis de desgaste/ciclos de batería en portátiles.
+- **🖱️ Gestor del Menú Contextual (`context_menu.py`):** Lista y permite ocultar/reactivar entradas del clic derecho del Explorador de Windows de forma 100% reversible (`LegacyDisable`).
+- **🔐 Bóveda Local de Contraseñas (`vault.py`):** Cifrado autenticado **AES-256-GCM** + **PBKDF2-HMAC-SHA256** (600,000 iteraciones), generador criptográfico, medidor de entropía, auto-bloqueo y limpieza automática del portapapeles en 30 segundos.
+
+---
 
 ### 1. 🗺️ Mapa de Almacenamiento, Particiones y Treemap (Nuevo en v2.3)
 - **Vista de Particiones y Unidades de Disco:**

@@ -63,6 +63,40 @@
           <span>Mapa de Disco</span>
         </button>
 
+        <button class="nav-item" data-tab="tab-monitor">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+          <span>Monitor y Red</span>
+        </button>
+
+        <button class="nav-item" data-tab="tab-hardware">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
+            <rect x="9" y="9" width="6" height="6"/>
+            <line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/>
+            <line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/>
+            <line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/>
+            <line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>
+          </svg>
+          <span>Salud Hardware</span>
+        </button>
+
+        <button class="nav-item" data-tab="tab-context-menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 6h16M4 12h16M4 18h10"/>
+          </svg>
+          <span>Menú Contextual</span>
+        </button>
+
+        <button class="nav-item" data-tab="tab-vault">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <span>Bóveda</span>
+        </button>
+
         <button class="nav-item" data-tab="tab-uninstaller">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
@@ -681,6 +715,261 @@
           </div>
         </section>
 
+        <!-- Vista v2.4: Monitor de Procesos y Red -->
+        <section class="tab-view" id="tab-monitor">
+          <div class="view-header">
+            <div>
+              <h2>Monitor de Procesos y Red</h2>
+              <p>Supervisa los procesos que consumen más recursos, cambia servidores DNS con 1 clic y mide tu latencia.</p>
+            </div>
+            <div class="view-tools">
+              <select id="monitor-sort-select" class="modern-input" style="width: 150px;">
+                <option value="memory">Ordenar por RAM</option>
+                <option value="cpu">Ordenar por CPU</option>
+              </select>
+              <button class="btn-tool" id="btn-refresh-monitor">🔄 Actualizar</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="treemap-header">
+              <div>
+                <h3>Top Procesos en Ejecución</h3>
+                <p class="setting-desc">Los procesos críticos de Windows están protegidos automáticamente contra cierre accidental.</p>
+              </div>
+            </div>
+            <div class="table-container" style="max-height: 290px;">
+              <table class="modern-table">
+                <thead>
+                  <tr>
+                    <th>Proceso</th>
+                    <th>PID</th>
+                    <th>Memoria RAM</th>
+                    <th>CPU %</th>
+                    <th style="text-align: right;">Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="monitor-processes-tbody">
+                  <tr><td colspan="5" class="table-loading">Cargando procesos activos...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="tools-grid" style="margin-top: 18px;">
+            <div class="card">
+              <h3>Selector Rápido de DNS</h3>
+              <p class="setting-desc">Mejora velocidad y privacidad de navegación (requiere Administrador).</p>
+              <div class="tool-input-row" style="margin-top: 12px;">
+                <select id="dns-adapter-select" class="modern-input" style="flex: 1;">
+                  <option value="">Detectando adaptadores...</option>
+                </select>
+              </div>
+              <div class="dns-presets-row">
+                <button class="btn-tool btn-dns-preset" data-preset="cloudflare">⚡ Cloudflare (1.1.1.1)</button>
+                <button class="btn-tool btn-dns-preset" data-preset="google">🌐 Google (8.8.8.8)</button>
+                <button class="btn-tool btn-dns-preset" data-preset="adguard">🛡️ AdGuard (Sin Ads)</button>
+                <button class="btn-tool btn-dns-preset" data-preset="auto">🔄 Automático (DHCP)</button>
+              </div>
+              <div class="tool-status-box" id="dns-status-box" style="margin-top: 10px;">Selecciona un adaptador y un perfil DNS.</div>
+            </div>
+
+            <div class="card">
+              <div class="treemap-header" style="margin-bottom: 10px;">
+                <div>
+                  <h3>Prueba Rápida de Latencia (Ping)</h3>
+                  <p class="setting-desc">Mide el tiempo de respuesta a servidores globales.</p>
+                </div>
+                <button class="btn-primary" id="btn-run-ping" style="padding: 6px 14px; font-size: 12px;">Probar Ping</button>
+              </div>
+              <div id="ping-results-list" class="ping-results-list">
+                <div class="empty-state">Pulsa "Probar Ping" para medir tu conexión.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Vista v2.4: Salud de Hardware (SSD S.M.A.R.T., TRIM y Batería) -->
+        <section class="tab-view" id="tab-hardware">
+          <div class="view-header">
+            <div>
+              <h2>Salud de Hardware (SSD y Batería)</h2>
+              <p>Consulta el estado S.M.A.R.T. de tus discos, ejecuta optimización TRIM y audita el desgaste real de la batería.</p>
+            </div>
+            <div class="view-tools">
+              <button class="btn-tool" id="btn-refresh-hardware">🔄 Actualizar Diagnóstico</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="treemap-header">
+              <div>
+                <h3>Estado de Discos Físicos (S.M.A.R.T.) &amp; Optimización TRIM</h3>
+                <p class="setting-desc">Mantén el rendimiento de lectura/escritura de tus SSD sin desgastar celdas.</p>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <select id="trim-drive-select" class="modern-input" style="width: 90px;">
+                  <option value="C">C:\</option>
+                </select>
+                <button class="btn-primary" id="btn-run-trim" style="padding: 6px 14px; font-size: 12px;">⚡ Ejecutar TRIM</button>
+              </div>
+            </div>
+            <div id="hardware-disks-grid" class="partitions-grid">
+              <div class="table-loading">Consultando discos físicos...</div>
+            </div>
+            <div class="tool-status-box" id="trim-status-box" style="margin-top: 12px;">Listo para optimizar unidades SSD.</div>
+          </div>
+
+          <div class="card" style="margin-top: 18px;">
+            <h3>Salud y Desgaste de Batería (Laptops)</h3>
+            <p class="setting-desc">Compara la capacidad original de fábrica contra la carga máxima actual.</p>
+            <div id="battery-health-panel" style="margin-top: 14px;">
+              <div class="table-loading">Analizando sensor de batería...</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Vista v2.4: Gestor del Menú Contextual -->
+        <section class="tab-view" id="tab-context-menu">
+          <div class="view-header">
+            <div>
+              <h2>Gestor del Menú Contextual ("Clic Derecho")</h2>
+              <p>Oculta o reactiva opciones del menú clic derecho del Explorador de Windows de forma 100% reversible.</p>
+            </div>
+            <div class="view-tools">
+              <input type="text" id="context-menu-search" placeholder="🔍 Filtrar entradas..." class="modern-input" style="width: 200px;">
+              <button class="btn-tool" id="btn-refresh-context-menu">🔄 Refrescar</button>
+            </div>
+          </div>
+
+          <div class="startup-table-card">
+            <div class="table-container" style="max-height: 490px;">
+              <table class="modern-table">
+                <thead>
+                  <tr>
+                    <th>Estado</th>
+                    <th>Opción del Menú</th>
+                    <th>Ámbito</th>
+                    <th>Comando</th>
+                    <th style="text-align: right;">Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="context-menu-tbody">
+                  <tr><td colspan="5" class="table-loading">Cargando entradas del menú contextual...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Vista v2.4: Bóveda Local de Contraseñas (AES-256-GCM) -->
+        <section class="tab-view" id="tab-vault">
+          <div class="view-header">
+            <div>
+              <h2>Bóveda Local Cifrada (AES-256-GCM)</h2>
+              <p>Almacenamiento 100% offline con PBKDF2-SHA256 (600,000 iteraciones). Tu contraseña maestra nunca se guarda en disco.</p>
+            </div>
+            <div class="view-tools" id="vault-unlocked-tools" style="display: none;">
+              <button class="btn-tool" id="btn-vault-export">💾 Exportar Respaldo</button>
+              <button class="btn-tool" id="btn-vault-lock" style="border-color: var(--warning); color: var(--warning);">🔒 Bloquear</button>
+            </div>
+          </div>
+
+          <!-- Pantalla de Bloqueo / Creación -->
+          <div class="card vault-lock-card" id="vault-lock-screen">
+            <div class="vault-lock-icon">🔐</div>
+            <h3 id="vault-lock-title">Desbloquear Bóveda</h3>
+            <p class="setting-desc" id="vault-lock-desc">Introduce tu contraseña maestra para descifrar tus credenciales en memoria.</p>
+
+            <div class="vault-auth-form">
+              <input type="password" id="vault-master-input" class="modern-input" placeholder="Contraseña maestra (mín. 8 caracteres)..." autocomplete="off">
+              <input type="password" id="vault-master-confirm" class="modern-input" placeholder="Confirmar contraseña maestra..." style="display: none;" autocomplete="off">
+              <div style="display: flex; gap: 10px; justify-content: center; margin-top: 8px;">
+                <button class="btn-primary" id="btn-vault-submit">Desbloquear</button>
+                <button class="btn-tool" id="btn-vault-import">📂 Importar Respaldo</button>
+              </div>
+              <div class="tool-status-box" id="vault-auth-status" style="margin-top: 10px; text-align: center;">Bóveda bloqueada.</div>
+            </div>
+          </div>
+
+          <!-- Panel Desbloqueado -->
+          <div id="vault-main-panel" style="display: none;">
+            <div class="tools-grid">
+              <!-- Formulario Nueva / Editar Credencial -->
+              <div class="card">
+                <h3 id="vault-form-title">Agregar Credencial</h3>
+                <input type="hidden" id="vault-entry-id">
+                <div class="vault-form-grid">
+                  <input type="text" id="vault-title" class="modern-input" placeholder="Título (ej. GitHub, Correo...)">
+                  <input type="text" id="vault-category" class="modern-input" placeholder="Categoría (ej. Trabajo, Personal)" value="General">
+                  <input type="text" id="vault-username" class="modern-input" placeholder="Usuario o correo electrónico">
+                  <input type="text" id="vault-url" class="modern-input" placeholder="URL (opcional, ej. https://...)">
+                  <div style="display: flex; gap: 8px; grid-column: 1 / -1;">
+                    <input type="password" id="vault-password" class="modern-input" placeholder="Contraseña" style="flex: 1;">
+                    <button class="btn-tool" id="btn-vault-toggle-pwd" title="Mostrar/Ocultar">👁️</button>
+                    <button class="btn-tool" id="btn-vault-gen-fill" title="Generar contraseña segura">🎲 Generar</button>
+                  </div>
+                  <div class="vault-strength-row" style="grid-column: 1 / -1;">
+                    <div class="vault-strength-bar"><div id="vault-strength-fill"></div></div>
+                    <span id="vault-strength-label" style="font-size: 11px; color: var(--text-muted);">Fortaleza: —</span>
+                  </div>
+                  <input type="text" id="vault-notes" class="modern-input" placeholder="Notas opcionales" style="grid-column: 1 / -1;">
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 12px;">
+                  <button class="btn-primary" id="btn-vault-save-entry">Guardar en Bóveda</button>
+                  <button class="btn-tool" id="btn-vault-clear-form">Limpiar</button>
+                </div>
+              </div>
+
+              <!-- Generador de Contraseñas -->
+              <div class="card">
+                <h3>Generador Criptográfico</h3>
+                <p class="setting-desc">Crea claves de alta entropía usando el módulo <code>secrets</code>.</p>
+                <div class="vault-gen-output">
+                  <code id="vault-gen-preview">Pulsa Generar...</code>
+                  <button class="btn-tool" id="btn-vault-copy-gen" style="padding: 4px 10px; font-size: 11px;">📋 Copiar</button>
+                </div>
+                <div class="tool-input-row" style="margin-top: 10px;">
+                  <label for="vault-gen-length" style="font-size: 12px; color: var(--text-muted);">Longitud: <strong id="vault-gen-length-val">18</strong></label>
+                  <input type="range" id="vault-gen-length" min="10" max="48" value="18" style="flex: 1;">
+                </div>
+                <div class="vault-gen-checks">
+                  <label><input type="checkbox" id="vault-gen-upper" checked> Mayúsculas</label>
+                  <label><input type="checkbox" id="vault-gen-digits" checked> Números</label>
+                  <label><input type="checkbox" id="vault-gen-symbols" checked> Símbolos</label>
+                </div>
+                <button class="btn-primary" id="btn-vault-generate" style="margin-top: 12px; width: 100%;">🎲 Generar Nueva Clave</button>
+              </div>
+            </div>
+
+            <!-- Lista de Credenciales Guardadas -->
+            <div class="card" style="margin-top: 18px;">
+              <div class="treemap-header">
+                <div>
+                  <h3>Credenciales Guardadas</h3>
+                  <p class="setting-desc">Al copiar una contraseña, el portapapeles se limpia automáticamente en 30 segundos.</p>
+                </div>
+                <input type="text" id="vault-search" class="modern-input" placeholder="🔍 Buscar en la bóveda..." style="width: 220px;">
+              </div>
+              <div class="table-container" style="max-height: 280px;">
+                <table class="modern-table">
+                  <thead>
+                    <tr>
+                      <th>Título</th>
+                      <th>Usuario</th>
+                      <th>Categoría</th>
+                      <th style="text-align: right;">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="vault-entries-tbody">
+                    <tr><td colspan="4" class="table-loading">No hay credenciales guardadas todavía.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </div>
 
       <!-- Barra de Acciones Globales & Barra de Progreso -->
@@ -731,7 +1020,7 @@
             </div>
           </div>
           <div class="log-terminal" id="log-terminal">
-            <div class="log-line dim">[Sistema] PyClean Pro v2.0 inicializado con motor GSAP.</div>
+            <div class="log-line dim">[Sistema] PyClean Pro v2.4 inicializado con motor GSAP.</div>
           </div>
         </div>
       </footer>
@@ -739,6 +1028,7 @@
     </main>
   </div>
 
+  <script src="modules_v24.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

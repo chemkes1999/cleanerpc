@@ -13,6 +13,10 @@ import subprocess
 import json
 from pathlib import Path
 import cleaner
+import sys_monitor
+import hardware_health
+import context_menu
+import vault
 
 try:
     import webview
@@ -24,6 +28,8 @@ class PyCleanAPI:
     def __init__(self):
         self._window = None
         self._is_busy = False
+        self._vault = vault.PasswordVault()
+        self._clipboard_timer = None
 
     def set_window(self, window):
         self._window = window
@@ -328,6 +334,161 @@ class PyCleanAPI:
         except Exception as e:
             return {"success": False, "message": str(e)}
 
+    # --- v2.4: Monitor de Procesos y Red ---
+    def get_top_processes(self, sort_by: str = "memory", limit: int = 35):
+        return sys_monitor.get_top_processes(sort_by=sort_by, limit=limit)
+
+    def terminate_process(self, pid: int):
+        ok, msg = sys_monitor.terminate_process(pid)
+        return {"success": ok, "message": msg}
+
+    def get_network_interfaces(self):
+        return sys_monitor.get_network_interfaces()
+
+    def set_dns_preset(self, adapter_name: str, preset: str):
+        ok, msg = sys_monitor.set_dns_preset(adapter_name, preset)
+        return {"success": ok, "message": msg}
+
+    def run_ping_test(self):
+        return sys_monitor.run_ping_test()
+
+    # --- v2.4: Salud de Hardware (SSD S.M.A.R.T., TRIM y Batería) ---
+    def get_disk_health(self):
+        return hardware_health.get_disk_health()
+
+    def run_ssd_trim(self, drive_letter: str = "C"):
+        ok, msg = hardware_health.run_ssd_trim(drive_letter)
+        return {"success": ok, "message": msg}
+
+    def get_battery_health(self):
+        return hardware_health.get_battery_health()
+
+    # --- v2.4: Gestor del Menú Contextual ---
+    def get_context_menu_items(self):
+        return context_menu.get_context_menu_items()
+
+    def toggle_context_menu_item(self, hive: str, subkey: str, enable: bool):
+        ok, msg = context_menu.toggle_context_menu_item(hive, subkey, enable)
+        return {"success": ok, "message": msg}
+
+    # --- v2.4: Bóveda Local de Contraseñas (AES-256-GCM) ---
+    def vault_status(self):
+        return self._vault.status()
+
+    def vault_create(self, master_password: str):
+        ok, msg = self._vault.create(master_password)
+        return {"success": ok, "message": msg, "status": self._vault.status()}
+
+    def vault_unlock(self, master_password: str):
+        ok, msg = self._vault.unlock(master_password)
+        return {"success": ok, "message": msg, "status": self._vault.status()}
+
+    def vault_lock(self):
+        self._vault.lock()
+        return {"success": True, "status": self._vault.status()}
+
+    def vault_get_entries(self):
+        return {"unlocked": self._vault.is_unlocked(), "entries": self._vault.list_entries()}
+
+    def vault_save_entry(
+        self,
+        title: str,
+        username: str,
+        password: str,
+        url: str = "",
+        category: str = "General",
+        notes: str = "",
+        entry_id: str = None,
+    ):
+        ok, result = self._vault.save_entry(
+            title=title,
+            username=username,
+            password=password,
+            url=url,
+            category=category,
+            notes=notes,
+            entry_id=entry_id,
+        )
+        if ok:
+            return {"success": True, "entry": result, "message": "Credencial guardada y cifrada."}
+        return {"success": False, "message": str(result)}
+
+    def vault_delete_entry(self, entry_id: str):
+        ok, msg = self._vault.delete_entry(entry_id)
+        return {"success": ok, "message": msg}
+
+    def vault_generate_password(
+        self,
+        length: int = 18,
+        use_upper: bool = True,
+        use_lower: bool = True,
+        use_digits: bool = True,
+        use_symbols: bool = True,
+    ):
+        pwd = vault.generate_password(
+            length=length,
+            use_upper=use_upper,
+            use_lower=use_lower,
+            use_digits=use_digits,
+            use_symbols=use_symbols,
+        )
+        return {"password": pwd, "strength": vault.evaluate_password_strength(pwd)}
+
+    def vault_evaluate_strength(self, password: str):
+        return vault.evaluate_password_strength(password)
+
+    def _set_system_clipboard(self, text: str) -> bool:
+        try:
+            if sys.platform == "win32":
+                si = subprocess.STARTUPINFO()
+                si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                subprocess.run(["clip"], input=text.encode("utf-16le"), check=True, startupinfo=si)
+                return True
+        except Exception:
+            pass
+        return False
+
+    def vault_copy_secret(self, secret_text: str, clear_after_seconds: int = 30):
+        """Copia un secreto al portapapeles de Windows y lo limpia automáticamente tras N segundos."""
+        copied = self._set_system_clipboard(secret_text or "")
+        if self._clipboard_timer:
+            try:
+                self._clipboard_timer.cancel()
+            except Exception:
+                pass
+        if copied and clear_after_seconds > 0:
+            self._clipboard_timer = threading.Timer(clear_after_seconds, self._set_system_clipboard, args=[""])
+            self._clipboard_timer.daemon = True
+            self._clipboard_timer.start()
+        return {"success": copied, "clear_after": clear_after_seconds}
+
+    def vault_export_backup(self):
+        if not self._window or not webview:
+            return {"success": False, "message": "Diálogo no disponible."}
+        dest = self._window.create_file_dialog(
+            webview.SAVE_DIALOG,
+            save_filename="pyclean_vault_backup.vault",
+            file_types=("Bóveda Cifrada (*.vault)", "Todos (*.*)"),
+        )
+        if not dest:
+            return {"success": False, "message": "Exportación cancelada."}
+        target = dest[0] if isinstance(dest, (list, tuple)) else dest
+        ok, msg = self._vault.export_encrypted_backup(target)
+        return {"success": ok, "message": msg}
+
+    def vault_import_backup(self):
+        if not self._window or not webview:
+            return {"success": False, "message": "Diálogo no disponible."}
+        src = self._window.create_file_dialog(
+            webview.OPEN_DIALOG,
+            allow_multiple=False,
+            file_types=("Bóveda Cifrada (*.vault;*.enc)", "Todos (*.*)"),
+        )
+        if not src:
+            return {"success": False, "message": "Importación cancelada."}
+        target = src[0] if isinstance(src, (list, tuple)) else src
+        ok, msg = self._vault.import_encrypted_backup(target)
+        return {"success": ok, "message": msg, "status": self._vault.status()}
 
 
 def run_web_gui():
@@ -340,11 +501,11 @@ def run_web_gui():
     index_file = os.path.join(web_dir, "index.html")
 
     window = webview.create_window(
-        title="PyClean Pro v2.1 - Suite de Optimización, Limpieza y Privacidad",
+        title="PyClean Pro v2.4 - Suite de Optimización, Hardware y Privacidad",
         url=f"file:///{index_file.replace(os.sep, '/')}",
         js_api=api,
-        width=1200,
-        height=850,
+        width=1240,
+        height=860,
         min_size=(980, 700),
         background_color="#0F111A"
     )

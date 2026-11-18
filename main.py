@@ -11,6 +11,9 @@ import sys
 import argparse
 import json
 import cleaner
+import sys_monitor
+import hardware_health
+import context_menu
 
 # Configurar salida de terminal en UTF-8 para Windows
 try:
@@ -169,6 +172,18 @@ def run_cli(args):
             target_dir = args.largest if os.path.exists(args.largest) else ("C:\\" if sys.platform == "win32" else "/")
             result["actions"]["largest_files"] = cleaner.find_largest_files(target_dir, min_size_mb=100, limit=50)
 
+        if args.processes:
+            result["actions"]["processes"] = sys_monitor.get_top_processes(sort_by="memory", limit=25)
+
+        if args.hardware:
+            result["actions"]["hardware"] = {
+                "disks": hardware_health.get_disk_health(),
+                "battery": hardware_health.get_battery_health(),
+            }
+
+        if args.context_menu:
+            result["actions"]["context_menu"] = context_menu.get_context_menu_items()
+
         if args.export:
             cleaner.export_report(result, args.export, format_type="json")
 
@@ -177,7 +192,7 @@ def run_cli(args):
 
     # Salida estándar legible para humanos
     print("=" * 65)
-    print("           ⚡ PyClean Pro v2.3 - Modo Consola (CLI)")
+    print("           ⚡ PyClean Pro v2.4 - Modo Consola (CLI)")
     print("=" * 65)
 
     admin_status = "Administrador" if cleaner.is_admin() else "Usuario Estándar (limitado)"
@@ -217,6 +232,35 @@ def run_cli(args):
                 print(f"    • {f['size_formatted']:>10} | {f['name']}")
                 print(f"      {f['path']}")
             print()
+
+    if args.processes:
+        procs = sys_monitor.get_top_processes(sort_by="memory", limit=20)
+        print("[+] Top 20 Procesos por consumo de RAM:")
+        for pr in procs:
+            tag = "[SO]" if pr["is_critical"] else "    "
+            print(f"    {tag} PID {pr['pid']:<6} | {pr['memory_formatted']:>10} | CPU {pr['cpu_percent']:>5}% | {pr['name']}")
+        print()
+
+    if args.hardware:
+        disks = hardware_health.get_disk_health()
+        batt = hardware_health.get_battery_health()
+        print("[+] Salud de Discos Físicos (S.M.A.R.T.):")
+        for d in disks:
+            print(f"    • {d['name']} ({d['media_type']}) -> Salud: {d['health_status']} | {d['size_formatted']}")
+        if batt.get("has_battery"):
+            hp = batt.get("health_percent")
+            hp_str = f"{hp}% (desgaste {batt.get('wear_percent')}%)" if hp is not None else "N/A"
+            print(f"\n[+] Batería: {batt.get('percent')}% | Salud real: {hp_str} | Ciclos: {batt.get('cycle_count', 0)}\n")
+        else:
+            print("\n[+] Batería: Equipo de escritorio (sin batería).\n")
+
+    if args.context_menu:
+        cm_items = context_menu.get_context_menu_items()
+        print(f"[+] Entradas del Menú Contextual ({len(cm_items)} detectadas):")
+        for c in cm_items[:30]:
+            st = "✔ Activo" if c["enabled"] else "❌ Oculto"
+            print(f"    • [{st}] {c['label']:<30} ({c['scope']})")
+        print()
 
     if args.startup:
         print("[+] Programas configurados para iniciar con Windows:")
@@ -344,6 +388,9 @@ def main():
     parser.add_argument("--privacy", type=str, choices=["on", "off"], metavar="STATE", help="Mitigar o restaurar telemetría y diagnósticos de Windows (on/off)")
     parser.add_argument("--partitions", action="store_true", help="Mostrar información detallada de particiones y unidades de disco")
     parser.add_argument("--largest", type=str, nargs="?", const="C:\\", metavar="DIR", help="Buscar archivos gigantes en el directorio o unidad (ej. --largest D:\\)")
+    parser.add_argument("--processes", action="store_true", help="Listar los procesos que más memoria RAM y CPU consumen")
+    parser.add_argument("--hardware", action="store_true", help="Mostrar salud S.M.A.R.T. de discos SSD/HDD y estado de batería")
+    parser.add_argument("--context-menu", action="store_true", help="Listar entradas del menú contextual (clic derecho) de Windows")
     parser.add_argument("--export", type=str, metavar="PATH", help="Ruta donde exportar el informe de resultados (.json o .txt)")
     parser.add_argument("--json", action="store_true", help="Emitir resultados en formato JSON estructurado")
     parser.add_argument("--all", action="store_true", help="Ejecutar escaneo, limpieza, optimización de RAM y DNS")
@@ -372,6 +419,9 @@ def main():
         or args.privacy
         or args.partitions
         or (args.largest is not None)
+        or args.processes
+        or args.hardware
+        or args.context_menu
     ):
         run_cli(args)
     else:

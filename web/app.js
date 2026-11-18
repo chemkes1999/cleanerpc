@@ -759,6 +759,10 @@ function addLog(message, tag = "dim") {
 // --- Event Listeners ---
 
 function setupEventListeners() {
+  if (typeof window.initV24Modules === "function") {
+    window.initV24Modules();
+  }
+
   // Navegación de pestañas
   document.querySelectorAll(".nav-item").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -773,6 +777,8 @@ function setupEventListeners() {
           AppState.treemapInitialized = true;
           loadTreemapPath(AppState.selectedDrive || "C:\\");
         }
+      } else if (typeof window.onV24TabSelected === "function") {
+        window.onV24TabSelected(tabId);
       }
     });
   });
