@@ -28,6 +28,8 @@ def build():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     main_script = os.path.join(base_dir, "main.py")
     web_dir = os.path.join(base_dir, "web")
+    icon_path = os.path.join(base_dir, "assets", "pyclean_icon.ico")
+    version_file = os.path.join(base_dir, "version_info.txt")
 
     # Separador de add-data según sistema operativo (; en Windows, : en Unix)
     sep = ";" if sys.platform == "win32" else ":"
@@ -40,8 +42,15 @@ def build():
         "--windowed",
         f"--add-data={data_arg}",
         "--clean",
-        main_script
     ]
+
+    if os.path.exists(icon_path):
+        cmd.append(f"--icon={icon_path}")
+
+    if sys.platform == "win32" and os.path.exists(version_file):
+        cmd.append(f"--version-file={version_file}")
+
+    cmd.append(main_script)
 
     print(f"\n[+] Ejecutando comando de compilación:\n{' '.join(cmd)}\n")
     res = subprocess.run(cmd)

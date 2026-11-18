@@ -4,7 +4,7 @@
 ; =====================================================================
 
 #define MyAppName "PyClean Pro"
-#define MyAppVersion "2.3.2"
+#define MyAppVersion "2.3.3"
 #define MyAppPublisher "chemkes1999"
 #define MyAppURL "https://github.com/chemkes1999/cleanerpc"
 #define MyAppExeName "PyCleanPro.exe"
@@ -17,11 +17,17 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
+VersionInfoVersion=2.3.3.0
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoDescription=Instalador oficial de {#MyAppName}
+VersionInfoProductName={#MyAppName}
+VersionInfoCopyright=Copyright (c) 2026 {#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=dist
 OutputBaseFilename=PyCleanPro-Setup
+SetupIconFile=assets\pyclean_icon.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
