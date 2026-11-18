@@ -1,14 +1,17 @@
 """
-PyClean Pro - Interfaz Gráfica Web Moderna (PyWebView + GSAP)
+PyClean Pro v2.1 - Interfaz Gráfica Web Moderna (PyWebView + GSAP)
 Provee la API de comunicación entre el frontend Web (HTML/CSS/JS + GSAP)
 y el motor de limpieza en Python (cleaner.py).
 """
+
+from __future__ import annotations
 
 import os
 import sys
 import threading
 import subprocess
 import json
+from pathlib import Path
 import cleaner
 
 try:
@@ -42,6 +45,7 @@ class PyCleanAPI:
         is_admin = cleaner.is_admin()
         config = cleaner.load_config()
         categories = cleaner.get_target_categories()
+        locked_apps = cleaner.get_running_locked_apps()
 
         cat_list = []
         for key, info in categories.items():
@@ -59,7 +63,8 @@ class PyCleanAPI:
             "stats": stats,
             "is_admin": is_admin,
             "config": config,
-            "categories": cat_list
+            "categories": cat_list,
+            "locked_apps": locked_apps
         }
 
     def get_system_stats(self, drive: str = "C:\\"):
@@ -68,6 +73,10 @@ class PyCleanAPI:
             "stats": cleaner.get_system_stats(drive=drive),
             "drives": cleaner.get_system_drives()
         }
+
+    def get_locked_apps(self):
+        """Detecta aplicaciones en ejecución que interfieren con la limpieza de caché."""
+        return cleaner.get_running_locked_apps()
 
     def scan_category(self, cat_key: str, min_age_hours: int = 24, exclusions: list = None):
         """Escanea una categoría específica y retorna sus resultados."""
@@ -146,28 +155,75 @@ class PyCleanAPI:
         cleaner.request_admin_elevation()
         return {"success": True}
 
+    def shred_file(self, file_path: str, passes: int = 1):
+        """Tritura un archivo de forma segura."""
+        ok, msg = cleaner.shred_file(file_path, passes=passes)
+        return {"success": ok, "message": msg}
+
+    def find_duplicates(self, target_folder: str, min_size_kb: int = 1):
+        """Busca archivos duplicados en la carpeta seleccionada."""
+        min_bytes = max(512, int(min_size_kb) * 1024)
+        duplicates = cleaner.find_duplicate_files(target_folder, min_size_bytes=min_bytes)
+        return {"duplicates": duplicates}
+
+    def export_report(self, report_data: dict, format_type: str = "json"):
+        """Exporta un reporte de escaneo o limpieza al Escritorio o Descargas."""
+        desktop = os.path.join(str(Path.home()), "Desktop")
+        if not os.path.exists(desktop):
+            desktop = os.path.join(str(Path.home()), "Descargas")
+        if not os.path.exists(desktop):
+            desktop = os.path.dirname(os.path.abspath(__file__))
+
+        ext = "json" if format_type.lower() == "json" else "txt"
+        filename = f"PyClean_Reporte_{int(cleaner.time.time())}.{ext}"
+        filepath = os.path.join(desktop, filename)
+
+        ok, msg = cleaner.export_report(report_data, filepath, format_type=format_type)
+        return {"success": ok, "message": msg, "filepath": filepath}
+
     def pick_folder(self):
-        """Abre un diálogo nativo para seleccionar una carpeta para exclusión."""
+        """Abre un diálogo nativo para seleccionar una carpeta."""
         try:
             import tkinter as tk
             from tkinter import filedialog
             root = tk.Tk()
             root.withdraw()
             root.attributes('-topmost', True)
-            folder = filedialog.askdirectory(title="Seleccionar carpeta a excluir")
+            folder = filedialog.askdirectory(title="Seleccionar carpeta")
             root.destroy()
             return {"folder": folder if folder else ""}
         except Exception:
             return {"folder": ""}
 
-    def open_folder(self, path: str):
-        """Abre la carpeta en el Explorador de Archivos de Windows."""
+    def pick_file(self):
+        """Abre un diálogo nativo para seleccionar un archivo."""
         try:
-            if os.path.exists(path):
-                if os.path.isfile(path):
-                    subprocess.Popen(f'explorer /select,"{os.path.abspath(path)}"')
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.withdraw()
+            root.attributes('-topmost', True)
+            filepath = filedialog.askopenfilename(title="Seleccionar archivo para triturar")
+            root.destroy()
+            return {"file": filepath if filepath else ""}
+        except Exception:
+            return {"file": ""}
+
+    def open_folder(self, path: str):
+        """Abre la carpeta en el Explorador de Archivos de Windows de forma segura."""
+        try:
+            abs_path = os.path.abspath(path)
+            if os.path.exists(abs_path):
+                if sys.platform == "win32":
+                    if os.path.isfile(abs_path):
+                        subprocess.Popen(["explorer", f"/select,{abs_path}"])
+                    else:
+                        subprocess.Popen(["explorer", abs_path])
+                elif sys.platform == "darwin":
+                    subprocess.Popen(["open", "-R" if os.path.isfile(abs_path) else "", abs_path])
                 else:
-                    os.startfile(os.path.abspath(path))
+                    target_dir = os.path.dirname(abs_path) if os.path.isfile(abs_path) else abs_path
+                    subprocess.Popen(["xdg-open", target_dir])
                 return {"success": True}
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -184,12 +240,12 @@ def run_web_gui():
     index_file = os.path.join(web_dir, "index.html")
 
     window = webview.create_window(
-        title="PyClean Pro v2.0 - Suite de Optimización y Limpieza",
+        title="PyClean Pro v2.1 - Suite de Optimización, Limpieza y Privacidad",
         url=f"file:///{index_file.replace(os.sep, '/')}",
         js_api=api,
-        width=1180,
-        height=820,
-        min_size=(960, 680),
+        width=1200,
+        height=850,
+        min_size=(980, 700),
         background_color="#0F111A"
     )
     api.set_window(window)

@@ -1,7 +1,10 @@
 """
-PyClean Pro v2.0 - Punto de Entrada Principal
-Permite ejecutar en Modo Gráfico (GUI) o Modo Consola (CLI) con soporte para automatización y JSON.
+PyClean Pro v2.1 - Punto de Entrada Principal
+Permite ejecutar en Modo Gráfico (GUI) o Modo Consola (CLI) con soporte para
+automatización, exportación de reportes, triturador seguro y buscador de duplicados.
 """
+
+from __future__ import annotations
 
 import sys
 import argparse
@@ -21,16 +24,46 @@ def run_cli(args):
     config = cleaner.load_config()
     min_age = config.get("min_age_hours", 24)
     exclusions = config.get("exclusions", [])
-    target_drive = args.drive.upper() if args.drive else "C:\\"
-    if not target_drive.endswith("\\"):
+    target_drive = args.drive.upper() if args.drive else ("C:\\" if sys.platform == "win32" else "/")
+    if sys.platform == "win32" and not target_drive.endswith("\\"):
         target_drive += "\\"
 
+    # Operación independiente: Triturar archivo
+    if args.shred:
+        passes = max(1, args.shred_passes) if hasattr(args, "shred_passes") and args.shred_passes else 1
+        print(f"[!] Triturando de forma segura: {args.shred} ({passes} pasada(s))...")
+        ok, msg = cleaner.shred_file(args.shred, passes=passes)
+        if ok:
+            print(f"    ✔ {msg}\n")
+        else:
+            print(f"    ❌ {msg}\n")
+        return
+
+    # Operación independiente: Buscador de duplicados
+    if args.duplicates:
+        print(f"[+] Buscando archivos duplicados en: {args.duplicates}...")
+        dups = cleaner.find_duplicate_files(args.duplicates, min_size_bytes=1024)
+        if not dups:
+            print("    ✔ No se encontraron archivos duplicados.\n")
+        else:
+            total_wasted = sum(d["wasted_bytes"] for d in dups)
+            print(f"    Encontrados {len(dups)} grupos de duplicados. Espacio desperdiciado: {cleaner.format_size(total_wasted)}.\n")
+            for i, group in enumerate(dups[:20], 1):
+                print(f"    [{i}] Hash: {group['hash'][:10]}... | Tamaño c/u: {group['size_formatted']} | Desperdicio: {group['wasted_formatted']}")
+                for f in group["files"]:
+                    print(f"        • {f}")
+            if len(dups) > 20:
+                print(f"\n    ... y {len(dups) - 20} grupos más.")
+            print()
+        return
+
+    # Salida estructurada JSON para automatización
     if args.json:
-        # Salida estructurada JSON para automatización
         result = {
             "is_admin": cleaner.is_admin(),
             "stats": cleaner.get_system_stats(drive=target_drive),
             "drives": cleaner.get_system_drives(),
+            "locked_apps": cleaner.get_running_locked_apps(),
             "actions": {}
         }
         categories = cleaner.get_target_categories()
@@ -83,22 +116,34 @@ def run_cli(args):
         if args.startup:
             result["actions"]["startup_programs"] = cleaner.get_startup_programs()
 
+        if args.export:
+            cleaner.export_report(result, args.export, format_type="json")
+
         print(json.dumps(result, indent=2, ensure_ascii=False))
         return
 
     # Salida estándar legible para humanos
     print("=" * 65)
-    print("           ⚡ PyClean Pro v2.0 - Modo Consola (CLI)")
+    print("           ⚡ PyClean Pro v2.1 - Modo Consola (CLI)")
     print("=" * 65)
 
     admin_status = "Administrador" if cleaner.is_admin() else "Usuario Estándar (limitado)"
     print(f"Privilegios actuales: {admin_status}")
     print(f"Filtro de seguridad: Archivos temporales < {min_age}h serán conservados.\n")
 
+    # Auditoría de procesos que bloquean limpieza
+    locked = cleaner.get_running_locked_apps()
+    if locked:
+        print("[!] Advertencia: Las siguientes aplicaciones están en ejecución y bloquean archivos de caché:")
+        for app in locked:
+            print(f"    ⚠️ {app['name']} ({app['process']})")
+        print("    (Para una limpieza 100% efectiva de navegadores, ciérralos antes de limpiar).\n")
+
     stats = cleaner.get_system_stats(drive=target_drive)
     free_gb = stats["disk_free"] / (1024 ** 3)
     total_gb = stats["disk_total"] / (1024 ** 3)
-    print(f"Disco {target_drive[:2]} {free_gb:.1f} GB libres de {total_gb:.1f} GB ({stats['disk_percent']}% en uso)")
+    drive_label = target_drive[:2] if len(target_drive) >= 2 else target_drive
+    print(f"Disco {drive_label}: {free_gb:.1f} GB libres de {total_gb:.1f} GB ({stats['disk_percent']}% en uso)")
     print(f"Memoria RAM en uso: {stats['ram_load']}%\n")
 
     if args.startup:
@@ -124,32 +169,54 @@ def run_cli(args):
         else:
             print(f"    ⚠️ Aviso DNS: {msg}\n")
 
+    action_report = {}
+
     if args.scan or args.dry_run:
         print("[+] Escaneando archivos basura...")
         total_size = 0
         total_files = 0
+        cat_report = {}
         for cat_key, cat_data in categories.items():
             size, count, _ = cleaner.scan_category(cat_key, cat_data, min_age_hours=min_age, exclusions=exclusions)
             total_size += size
             total_files += count
             if size > 0:
-                print(f"    • {cat_data['name']:<40}: {cleaner.format_size(size):>10} ({count:,} archivos)")
+                print(f"    • {cat_data['name']:<45}: {cleaner.format_size(size):>10} ({count:,} archivos)")
+                cat_report[cat_key] = {"name": cat_data["name"], "size_formatted": cleaner.format_size(size), "count": count}
         print(f"\nTotal recuperable: {cleaner.format_size(total_size)} en {total_files:,} archivos.\n")
+        action_report = {
+            "total_formatted": cleaner.format_size(total_size),
+            "total_files": total_files,
+            "categories": cat_report
+        }
 
     if args.clean or args.all:
         print("[+] Limpiando archivos basura...")
         total_freed = 0
         total_deleted = 0
         total_skipped = 0
+        cat_clean_report = {}
         for cat_key, cat_data in categories.items():
             freed, deleted, skipped = cleaner.clean_category(cat_key, cat_data, min_age_hours=min_age, exclusions=exclusions)
             total_freed += freed
             total_deleted += deleted
             total_skipped += skipped
             if freed > 0 or deleted > 0:
-                print(f"    ✔ {cat_data['name']:<40}: {cleaner.format_size(freed):>10} ({deleted} eliminados, {skipped} protegidos)")
+                print(f"    ✔ {cat_data['name']:<45}: {cleaner.format_size(freed):>10} ({deleted} eliminados, {skipped} protegidos)")
+                cat_clean_report[cat_key] = {"name": cat_data["name"], "freed_formatted": cleaner.format_size(freed), "deleted": deleted, "skipped": skipped}
         print(f"\n✨ Limpieza finalizada: {cleaner.format_size(total_freed)} liberados.")
         print(f"   Archivos eliminados: {total_deleted:,} | Omitidos (bloqueados o recientes): {total_skipped:,}\n")
+        action_report = {
+            "total_freed_formatted": cleaner.format_size(total_freed),
+            "total_deleted": total_deleted,
+            "total_skipped": total_skipped,
+            "categories": cat_clean_report
+        }
+
+    if args.export and action_report:
+        ext = "txt" if args.export.endswith(".txt") else "json"
+        cleaner.export_report(action_report, args.export, format_type=ext)
+        print(f"📄 Reporte exportado a: {args.export}\n")
 
 
 def run_modern_gui():
@@ -164,28 +231,30 @@ def run_modern_gui():
 
 def run_gui():
     """Lanza la interfaz gráfica clásica en Tkinter."""
-    import tkinter as tk
-    from gui import PyCleanGUI
+    try:
+        import tkinter as tk
+        from gui import PyCleanGUI
 
-    root = tk.Tk()
-    app = PyCleanGUI(root)
-    root.mainloop()
+        root = tk.Tk()
+        app = PyCleanGUI(root)
+        root.mainloop()
+    except Exception as e:
+        print(f"[!] No se pudo iniciar Tkinter ({e}). Ejecuta en modo CLI con --scan o --clean.")
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="PyClean Pro v2.0 - Suite de limpieza y optimización para Windows",
+        description="PyClean Pro v2.1 - Suite de limpieza, optimización y privacidad para Windows",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Ejemplos:\n"
-               "  python main.py              (Abre la interfaz moderna animada con GSAP)\n"
-               "  python main.py --legacy-gui (Abre la interfaz gráfica clásica de Tkinter)\n"
-               "  python main.py --scan       (Analiza el espacio basura sin borrar nada)\n"
-               "  python main.py --clean      (Limpia los archivos basura directamente)\n"
-               "  python main.py --startup    (Lista los programas de inicio en consola)\n"
-               "  python main.py --json --scan(Genera un informe estructurado en formato JSON)\n"
-               "  python main.py --ram        (Optimiza y libera memoria RAM)\n"
-               "  python main.py --dns        (Vacía la caché DNS)\n"
-               "  python main.py --all        (Optimiza RAM, DNS y limpia todo)"
+               "  python main.py                     (Abre la interfaz moderna animada con GSAP)\n"
+               "  python main.py --scan              (Analiza el espacio basura sin borrar nada)\n"
+               "  python main.py --clean             (Limpia los archivos basura directamente)\n"
+               "  python main.py --shred archivo.txt (Tritura un archivo confidencial de forma irrecuperable)\n"
+               "  python main.py --duplicates D:\\Docs(Busca archivos duplicados por contenido SHA-256)\n"
+               "  python main.py --export rep.txt    (Exporta el resultado a archivo de texto o json)\n"
+               "  python main.py --ram --dns         (Optimiza memoria RAM y vacía DNS)\n"
+               "  python main.py --all               (Optimiza RAM, DNS y limpia todo)"
     )
     parser.add_argument("--scan", action="store_true", help="Escanear y mostrar espacio recuperable")
     parser.add_argument("--clean", action="store_true", help="Eliminar archivos basura")
@@ -194,6 +263,10 @@ def main():
     parser.add_argument("--dns", action="store_true", help="Vaciar caché de resolución DNS")
     parser.add_argument("--startup", action="store_true", help="Listar programas de inicio automático de Windows")
     parser.add_argument("--drive", type=str, default="C:\\", help="Unidad de disco a analizar (ej. C:\\ o D:\\)")
+    parser.add_argument("--shred", type=str, metavar="FILE", help="Triturar y destruir un archivo de forma segura")
+    parser.add_argument("--shred-passes", type=int, default=1, help="Número de pasadas de sobreescritura al triturar (default: 1)")
+    parser.add_argument("--duplicates", type=str, metavar="DIR", help="Buscar archivos duplicados en el directorio especificado")
+    parser.add_argument("--export", type=str, metavar="PATH", help="Ruta donde exportar el informe de resultados (.json o .txt)")
     parser.add_argument("--json", action="store_true", help="Emitir resultados en formato JSON estructurado")
     parser.add_argument("--all", action="store_true", help="Ejecutar escaneo, limpieza, optimización de RAM y DNS")
     parser.add_argument("--cli", action="store_true", help="Forzar modo consola interactivo")
@@ -203,7 +276,19 @@ def main():
 
     if args.legacy_gui:
         run_gui()
-    elif args.scan or args.clean or args.dry_run or args.ram or args.dns or args.startup or args.all or args.cli or args.json:
+    elif (
+        args.scan
+        or args.clean
+        or args.dry_run
+        or args.ram
+        or args.dns
+        or args.startup
+        or args.all
+        or args.cli
+        or args.json
+        or args.shred
+        or args.duplicates
+    ):
         run_cli(args)
     else:
         run_modern_gui()

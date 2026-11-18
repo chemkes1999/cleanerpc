@@ -1031,3 +1031,189 @@ input:checked + .slider:before {
   font-size: 13px;
   padding: 24px;
 }
+
+/* ==========================================================================
+   PyClean Pro v2.1 - Estilos para Banner de Bloqueo, Herramientas y Exportación
+   ========================================================================== */
+
+.locked-apps-banner {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--radius-md);
+  padding: 10px 18px;
+  margin: 12px 24px 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #FDE68A;
+  font-size: 13px;
+  animation: fadeInDown 0.3s ease;
+}
+
+.locked-apps-banner strong {
+  color: #FBBF24;
+}
+
+.locked-apps-banner .banner-apps {
+  color: #FFF;
+  font-weight: 600;
+}
+
+.btn-export-report {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60A5FA;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.btn-export-report:hover {
+  background: rgba(59, 130, 246, 0.3);
+  color: #FFF;
+}
+
+/* Pestaña de Herramientas de Privacidad y Duplicados */
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 20px;
+  padding: 20px 0;
+}
+
+.tool-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tool-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tool-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tool-icon.shred-icon {
+  background: rgba(239, 68, 68, 0.15);
+  color: #F87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.tool-icon.dup-icon {
+  background: rgba(139, 92, 246, 0.15);
+  color: #A78BFA;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.tool-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.tool-card-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.tool-card-header p {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.tool-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tool-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.tool-input-row input {
+  flex: 1;
+}
+
+.tool-status-box {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+}
+
+.dup-results-container {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dup-item {
+  background: var(--bg-card);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.dup-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-weight: 600;
+  color: var(--accent-cyan);
+}
+
+.dup-files-list {
+  font-family: Consolas, monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  word-break: break-all;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

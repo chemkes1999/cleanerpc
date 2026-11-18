@@ -79,6 +79,17 @@ function applyInitialState(state) {
   document.getElementById("setting-age").value = AppState.config.min_age_hours || 24;
   updatePresetButtons(AppState.config.min_age_hours || 24);
 
+  // Comprobar aplicaciones abiertas que bloquean limpieza
+  const lockedBanner = document.getElementById("locked-apps-banner");
+  if (state.locked_apps && state.locked_apps.length > 0) {
+    const appsText = state.locked_apps.map(a => a.name).join(", ");
+    document.getElementById("banner-apps-text").textContent = appsText;
+    lockedBanner.style.display = "flex";
+    addLog(`Aviso: Detectadas aplicaciones abiertas (${appsText}). Ciérralas para limpiar su caché.`, "warning");
+  } else {
+    lockedBanner.style.display = "none";
+  }
+
   // Cargar lista de inicio
   loadStartupPrograms();
 }
@@ -863,6 +874,146 @@ function setupEventListeners() {
 
   // Refrescar programas de inicio
   document.getElementById("btn-refresh-startup").addEventListener("click", loadStartupPrograms);
+
+  // Exportar Reporte
+  document.getElementById("btn-export-report").addEventListener("click", async () => {
+    if (!window.pywebview) {
+      addLog("Exportación disponible al ejecutar la app en Windows.", "info");
+      return;
+    }
+    const reportData = {
+      timestamp: new Date().toISOString(),
+      drive: AppState.selectedDrive,
+      scanned_bytes: AppState.totalScannedBytes,
+      scanned_files: AppState.totalScannedFiles,
+      categories: AppState.scannedResults
+    };
+    addLog("Generando y exportando reporte estructurado...", "info");
+    try {
+      const res = await window.pywebview.api.export_report(reportData, "json");
+      if (res.success) {
+        addLog(res.message, "success");
+      } else {
+        addLog(`Error al exportar: ${res.message}`, "error");
+      }
+    } catch (err) {
+      addLog(`Error en exportación: ${err}`, "error");
+    }
+  });
+
+  // --- Herramienta 1: Triturador de Archivos ---
+  const shredInput = document.getElementById("shred-file-path");
+  const btnRunShred = document.getElementById("btn-run-shred");
+  const shredStatus = document.getElementById("shred-status");
+
+  document.getElementById("btn-browse-shred").addEventListener("click", async () => {
+    if (window.pywebview) {
+      const res = await window.pywebview.api.pick_file();
+      if (res.file) {
+        shredInput.value = res.file;
+        btnRunShred.disabled = false;
+        shredStatus.textContent = `Archivo seleccionado listo para destrucción: ${res.file}`;
+        shredStatus.style.color = "var(--text-main)";
+      }
+    }
+  });
+
+  btnRunShred.addEventListener("click", async () => {
+    const filePath = shredInput.value.trim();
+    if (!filePath) return;
+    const passes = parseInt(document.getElementById("shred-passes").value) || 1;
+
+    if (!confirm(`⚠️ ATENCIÓN: Se triturará y eliminará de forma irreversible el archivo:\n\n${filePath}\n\n¿Deseas continuar?`)) {
+      return;
+    }
+
+    shredStatus.textContent = `Triturando archivo (${passes} pasadas)...`;
+    btnRunShred.disabled = true;
+    addLog(`Iniciando triturado seguro de: ${filePath}`, "warning");
+
+    try {
+      const res = await window.pywebview.api.shred_file(filePath, passes);
+      if (res.success) {
+        shredStatus.textContent = `✔ ${res.message}`;
+        shredStatus.style.color = "var(--success)";
+        shredInput.value = "";
+        addLog(res.message, "success");
+      } else {
+        shredStatus.textContent = `❌ ${res.message}`;
+        shredStatus.style.color = "var(--danger)";
+        addLog(res.message, "error");
+        btnRunShred.disabled = false;
+      }
+    } catch (err) {
+      shredStatus.textContent = `Error: ${err}`;
+      shredStatus.style.color = "var(--danger)";
+      addLog(`Fallo al triturar: ${err}`, "error");
+      btnRunShred.disabled = false;
+    }
+  });
+
+  // --- Herramienta 2: Buscador de Duplicados ---
+  const dupInput = document.getElementById("dup-folder-path");
+  const btnRunDup = document.getElementById("btn-run-dup");
+  const dupStatus = document.getElementById("dup-status");
+  const dupResults = document.getElementById("dup-results");
+
+  document.getElementById("btn-browse-dup").addEventListener("click", async () => {
+    if (window.pywebview) {
+      const res = await window.pywebview.api.pick_folder();
+      if (res.folder) {
+        dupInput.value = res.folder;
+        btnRunDup.disabled = false;
+        dupStatus.textContent = `Carpeta seleccionada: ${res.folder}`;
+      }
+    }
+  });
+
+  btnRunDup.addEventListener("click", async () => {
+    const folderPath = dupInput.value.trim();
+    if (!folderPath) return;
+
+    dupStatus.textContent = "Analizando archivos y calculando firmas SHA-256...";
+    btnRunDup.disabled = true;
+    dupResults.style.display = "none";
+    dupResults.innerHTML = "";
+    addLog(`Auditando duplicados en: ${folderPath}`, "info");
+
+    try {
+      const res = await window.pywebview.api.find_duplicates(folderPath, 1);
+      btnRunDup.disabled = false;
+      const dups = res.duplicates || [];
+
+      if (dups.length === 0) {
+        dupStatus.textContent = "✔ No se encontraron archivos duplicados en la carpeta.";
+        addLog("Auditoría de duplicados: 0 duplicados encontrados.", "success");
+      } else {
+        const totalWasted = dups.reduce((acc, d) => acc + (d.wasted_bytes || 0), 0);
+        dupStatus.textContent = `✔ Se encontraron ${dups.length} grupos de duplicados (${formatSize(totalWasted)} desperdiciados).`;
+        addLog(`Duplicados encontrados: ${dups.length} grupos (${formatSize(totalWasted)} desperdiciados).`, "warning");
+
+        dupResults.style.display = "flex";
+        dups.forEach(g => {
+          const item = document.createElement("div");
+          item.className = "dup-item";
+          item.innerHTML = `
+            <div class="dup-header">
+              <span>Tamaño c/u: ${g.size_formatted}</span>
+              <span style="color: var(--warning);">Desperdicio: ${g.wasted_formatted}</span>
+            </div>
+            <div class="dup-files-list">
+              ${g.files.map(f => `<div>• ${escapeHtml(f)}</div>`).join("")}
+            </div>
+          `;
+          dupResults.appendChild(item);
+        });
+      }
+    } catch (err) {
+      btnRunDup.disabled = false;
+      dupStatus.textContent = `Error auditando duplicados: ${err}`;
+      addLog(`Fallo al buscar duplicados: ${err}`, "error");
+    }
+  });
 }
 
 function escapeHtml(str) {

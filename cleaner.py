@@ -1,36 +1,75 @@
 """
-PyClean Pro - Motor de Limpieza y Optimización para Windows
-Módulo seguro de escaneo, eliminación de temporales y optimización del sistema.
+PyClean Pro v2.1 - Motor de Limpieza, Seguridad y Optimización para Windows
+Módulo seguro de escaneo, eliminación de temporales, triturador seguro,
+buscador de duplicados, auditor de bloqueos y optimización del sistema.
 """
+
+from __future__ import annotations
 
 import os
 import sys
 import shutil
 import subprocess
 import ctypes
-from ctypes import wintypes
+import hashlib
 import glob
 import time
 import json
+import logging
 from pathlib import Path
-import winreg
+
+# Configurar logger local
+logger = logging.getLogger("pyclean")
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+
+# Importaciones condicionales para Windows (permitiendo ejecución multiplataforma y tests)
+try:
+    from ctypes import wintypes
+except (ImportError, ValueError):
+    wintypes = None
+
+try:
+    import winreg
+except ImportError:
+    winreg = None
 
 # Ruta de archivo de configuración local
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cleaner_config.json")
 
 # Definición de estructuras ctypes para memoria en Windows
-class MEMORYSTATUSEX(ctypes.Structure):
-    _fields_ = [
-        ('dwLength', wintypes.DWORD),
-        ('dwMemoryLoad', wintypes.DWORD),
-        ('ullTotalPhys', ctypes.c_ulonglong),
-        ('ullAvailPhys', ctypes.c_ulonglong),
-        ('ullTotalPageFile', ctypes.c_ulonglong),
-        ('ullAvailPageFile', ctypes.c_ulonglong),
-        ('ullTotalVirtual', ctypes.c_ulonglong),
-        ('ullAvailVirtual', ctypes.c_ulonglong),
-        ('ullAvailExtendedVirtual', ctypes.c_ulonglong),
-    ]
+if wintypes:
+    class MEMORYSTATUSEX(ctypes.Structure):
+        _fields_ = [
+            ('dwLength', wintypes.DWORD),
+            ('dwMemoryLoad', wintypes.DWORD),
+            ('ullTotalPhys', ctypes.c_ulonglong),
+            ('ullAvailPhys', ctypes.c_ulonglong),
+            ('ullTotalPageFile', ctypes.c_ulonglong),
+            ('ullAvailPageFile', ctypes.c_ulonglong),
+            ('ullTotalVirtual', ctypes.c_ulonglong),
+            ('ullAvailVirtual', ctypes.c_ulonglong),
+            ('ullAvailExtendedVirtual', ctypes.c_ulonglong),
+        ]
+else:
+    MEMORYSTATUSEX = None
+
+
+# Mapeo de procesos que bloquean la limpieza de caché
+LOCKED_APPS_MAP = {
+    "Google Chrome": ["chrome.exe"],
+    "Microsoft Edge": ["msedge.exe"],
+    "Brave Browser": ["brave.exe"],
+    "Mozilla Firefox": ["firefox.exe"],
+    "Opera / Opera GX": ["opera.exe", "opera_gx.exe"],
+    "Vivaldi": ["vivaldi.exe"],
+    "Discord": ["Discord.exe"],
+    "Spotify": ["Spotify.exe"],
+    "Visual Studio Code": ["Code.exe"],
+}
 
 
 def load_config() -> dict:
@@ -45,8 +84,8 @@ def load_config() -> dict:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 default_cfg.update(data)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Error leyendo cleaner_config.json: %s", e)
     return default_cfg
 
 
@@ -56,12 +95,15 @@ def save_config(cfg: dict) -> bool:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=4, ensure_ascii=False)
         return True
-    except Exception:
+    except Exception as e:
+        logger.error("Error guardando cleaner_config.json: %s", e)
         return False
 
 
 def is_admin() -> bool:
     """Verifica si el script se está ejecutando con privilegios de Administrador."""
+    if sys.platform != "win32" or not hasattr(ctypes, "windll"):
+        return False
     try:
         return bool(ctypes.windll.shell32.IsUserAnAdmin())
     except Exception:
@@ -70,6 +112,8 @@ def is_admin() -> bool:
 
 def request_admin_elevation():
     """Relanza la aplicación actual solicitando elevación de Administrador (UAC)."""
+    if sys.platform != "win32" or not hasattr(ctypes, "windll"):
+        return False, "La elevación UAC sólo está disponible en Windows."
     try:
         script = os.path.abspath(sys.argv[0])
         params = " ".join([f'"{arg}"' for arg in sys.argv[1:]])
@@ -81,7 +125,7 @@ def request_admin_elevation():
         return False, str(e)
 
 
-def format_size(size_bytes: int) -> str:
+def format_size(size_bytes: int | float) -> str:
     """Convierte un tamaño en bytes a formato legible (B, KB, MB, GB, TB)."""
     if size_bytes <= 0:
         return "0 B"
@@ -94,41 +138,99 @@ def format_size(size_bytes: int) -> str:
     return f"{size:.2f} {units[i]}"
 
 
-def get_system_drives():
+def is_safe_link_or_junction(path: str) -> bool:
+    """
+    Verifica si una ruta es un enlace simbólico o un punto de unión (Directory Junction) en Windows.
+    Previene atravesar o borrar carpetas redirigidas que apunten a datos personales o externos.
+    """
+    try:
+        if os.path.islink(path):
+            return True
+        if hasattr(os.path, "isjunction") and os.path.isjunction(path):
+            return True
+    except (OSError, ValueError):
+        return True  # Por seguridad, si falla la inspección se trata como inseguro
+    return False
+
+
+def get_running_locked_apps() -> list[dict]:
+    """
+    Detecta aplicaciones comunes en ejecución que mantienen bloqueados archivos de caché.
+    Retorna lista de diccionarios: [{'name': 'Google Chrome', 'process': 'chrome.exe'}, ...]
+    """
+    running = []
+    if sys.platform != "win32":
+        return running
+
+    try:
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        res = subprocess.run(
+            ["tasklist", "/FO", "CSV", "/NH"],
+            capture_output=True,
+            text=True,
+            startupinfo=startupinfo,
+            check=False,
+            encoding="utf-8",
+            errors="ignore"
+        )
+        if res.returncode == 0:
+            active_exes = set()
+            for line in res.stdout.splitlines():
+                if line.strip():
+                    parts = line.split('","')
+                    if parts:
+                        exe = parts[0].strip('"').lower()
+                        active_exes.add(exe)
+
+            for app_name, exes in LOCKED_APPS_MAP.items():
+                for exe in exes:
+                    if exe.lower() in active_exes:
+                        running.append({"name": app_name, "process": exe})
+                        break
+    except Exception as e:
+        logger.debug("Error detectando procesos bloqueados: %s", e)
+
+    return running
+
+
+def get_system_drives() -> list[dict]:
     """
     Detecta todas las unidades fijas y extraíbles del sistema con su espacio.
     Retorna lista de diccionarios: [{'letter': 'C:\\', 'type': 'fixed', ...}]
     """
     drives = []
-    try:
-        bitmask = ctypes.windll.kernel32.GetLogicalDrives()
-        for letter_idx in range(26):
-            if bitmask & (1 << letter_idx):
-                drive_letter = f"{chr(65 + letter_idx)}:\\"
-                drive_type = ctypes.windll.kernel32.GetDriveTypeW(drive_letter)
-                # DRIVE_REMOVABLE = 2, DRIVE_FIXED = 3
-                if drive_type in (2, 3):
-                    try:
-                        total, used, free = shutil.disk_usage(drive_letter)
-                        pct = round((used / total) * 100, 1) if total > 0 else 0.0
-                        drives.append({
-                            "letter": drive_letter,
-                            "type": "Fijo" if drive_type == 3 else "Extraíble",
-                            "total": total,
-                            "used": used,
-                            "free": free,
-                            "percent": pct
-                        })
-                    except Exception:
-                        pass
-    except Exception:
-        pass
+    if sys.platform == "win32" and hasattr(ctypes, "windll"):
+        try:
+            bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+            for letter_idx in range(26):
+                if bitmask & (1 << letter_idx):
+                    drive_letter = f"{chr(65 + letter_idx)}:\\"
+                    drive_type = ctypes.windll.kernel32.GetDriveTypeW(drive_letter)
+                    # DRIVE_REMOVABLE = 2, DRIVE_FIXED = 3
+                    if drive_type in (2, 3):
+                        try:
+                            total, used, free = shutil.disk_usage(drive_letter)
+                            pct = round((used / total) * 100, 1) if total > 0 else 0.0
+                            drives.append({
+                                "letter": drive_letter,
+                                "type": "Fijo" if drive_type == 3 else "Extraíble",
+                                "total": total,
+                                "used": used,
+                                "free": free,
+                                "percent": pct
+                            })
+                        except Exception:
+                            pass
+        except Exception:
+            pass
 
     if not drives:
+        root_path = "C:\\" if sys.platform == "win32" else "/"
         try:
-            total, used, free = shutil.disk_usage("C:\\")
+            total, used, free = shutil.disk_usage(root_path)
             drives.append({
-                "letter": "C:\\",
+                "letter": root_path,
                 "type": "Fijo",
                 "total": total,
                 "used": used,
@@ -141,7 +243,7 @@ def get_system_drives():
     return drives
 
 
-def get_system_stats(drive: str = "C:\\"):
+def get_system_stats(drive: str = "C:\\") -> dict:
     """Obtiene estadísticas de uso de disco y memoria RAM del sistema."""
     stats = {
         "drive": drive,
@@ -154,9 +256,8 @@ def get_system_stats(drive: str = "C:\\"):
         "ram_avail": 0,
         "ram_used": 0,
     }
-    # Disco seleccionado
     try:
-        target_drive = drive if os.path.exists(drive) else "C:\\"
+        target_drive = drive if os.path.exists(drive) else ("C:\\" if sys.platform == "win32" else "/")
         total, used, free = shutil.disk_usage(target_drive)
         stats["disk_total"] = total
         stats["disk_used"] = used
@@ -165,33 +266,31 @@ def get_system_stats(drive: str = "C:\\"):
     except Exception:
         pass
 
-    # Memoria RAM vía Win32 API
-    try:
-        mem = MEMORYSTATUSEX()
-        mem.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
-        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(mem)):
-            stats["ram_load"] = mem.dwMemoryLoad
-            stats["ram_total"] = mem.ullTotalPhys
-            stats["ram_avail"] = mem.ullAvailPhys
-            stats["ram_used"] = mem.ullTotalPhys - mem.ullAvailPhys
-    except Exception:
-        pass
+    if sys.platform == "win32" and hasattr(ctypes, "windll") and MEMORYSTATUSEX:
+        try:
+            mem = MEMORYSTATUSEX()
+            mem.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(mem)):
+                stats["ram_load"] = mem.dwMemoryLoad
+                stats["ram_total"] = mem.ullTotalPhys
+                stats["ram_avail"] = mem.ullAvailPhys
+                stats["ram_used"] = mem.ullTotalPhys - mem.ullAvailPhys
+        except Exception:
+            pass
 
     return stats
 
 
-def _get_chromium_cache_paths(user_data_path: str):
+def _get_chromium_cache_paths(user_data_path: str) -> list[str]:
     """Resuelve rutas de caché para todos los perfiles de Chromium (Default, Profile 1, etc.)."""
     paths = []
     if not os.path.isdir(user_data_path):
         return paths
 
-    # Caché de sombreadores global
     shader = os.path.join(user_data_path, "ShaderCache")
     if os.path.exists(shader):
         paths.append(shader)
 
-    # Iterar carpetas de perfiles
     try:
         for entry in os.listdir(user_data_path):
             full_entry = os.path.join(user_data_path, entry)
@@ -208,15 +307,16 @@ def _get_chromium_cache_paths(user_data_path: str):
     return paths
 
 
-def get_target_categories():
+def get_target_categories() -> dict:
     """
     Define y resuelve las rutas seguras para limpieza en el sistema del usuario actual.
-    Incluye multi-perfil y soporte ampliado para navegadores y herramientas de desarrollo.
+    Incluye multi-perfil, herramientas de desarrollo y soporte ampliado.
     """
     local_app_data = os.environ.get("LOCALAPPDATA", "")
     app_data = os.environ.get("APPDATA", "")
-    user_temp = os.environ.get("TEMP", os.path.join(local_app_data, "Temp"))
+    user_temp = os.environ.get("TEMP", os.path.join(local_app_data, "Temp") if local_app_data else "")
     system_root = os.environ.get("SystemRoot", r"C:\Windows")
+    user_home = str(Path.home())
 
     # Chromium multi-profile paths
     chrome_paths = _get_chromium_cache_paths(os.path.join(local_app_data, r"Google\Chrome\User Data"))
@@ -249,12 +349,26 @@ def get_target_categories():
         os.path.join(local_app_data, r"Spotify\Storage")
     ]
 
+    # Caches de desarrollo (Pip, NPM, PNPM, Yarn, Cargo)
+    dev_paths = [
+        os.path.join(local_app_data, r"pip\cache"),
+        os.path.join(app_data, r"npm-cache"),
+        os.path.join(local_app_data, r"pnpm\store"),
+        os.path.join(local_app_data, r"Yarn\Cache"),
+        os.path.join(user_home, r".cargo\registry\cache")
+    ]
+
+    # Componentes Web de Windows (INetCache)
+    inet_paths = [
+        os.path.join(local_app_data, r"Microsoft\Windows\INetCache")
+    ]
+
     categories = {
         "user_temp": {
             "name": "Temporales de Usuario",
             "desc": "Archivos residuales en %TEMP% y carpetas temporales de aplicaciones",
             "requires_admin": False,
-            "paths": [user_temp],
+            "paths": [user_temp] if user_temp else [],
             "is_recycle_bin": False,
             "supports_age_filter": True
         },
@@ -322,6 +436,14 @@ def get_target_categories():
             "is_recycle_bin": False,
             "supports_age_filter": False
         },
+        "dev_tools": {
+            "name": "Caché de Desarrollo (Pip, Node, Yarn, Cargo)",
+            "desc": "Caché de paquetes y compilaciones descargadas por Pip, NPM, PNPM, Yarn y Cargo",
+            "requires_admin": False,
+            "paths": dev_paths,
+            "is_recycle_bin": False,
+            "supports_age_filter": True
+        },
         "app_discord": {
             "name": "Caché de Discord",
             "desc": "Imágenes, gifs y datos en caché de la aplicación Discord",
@@ -346,6 +468,14 @@ def get_target_categories():
             "is_recycle_bin": False,
             "supports_age_filter": False
         },
+        "windows_inet_cache": {
+            "name": "Caché Web de Windows (INetCache)",
+            "desc": "Archivos web temporales y caché del sistema de Windows",
+            "requires_admin": False,
+            "paths": inet_paths,
+            "is_recycle_bin": False,
+            "supports_age_filter": True
+        },
         "crash_dumps": {
             "name": "Volcados de Error y WER",
             "desc": "Reportes de bloqueo y volcados de memoria por caídas de software",
@@ -354,7 +484,7 @@ def get_target_categories():
                 os.path.join(local_app_data, "CrashDumps"),
                 os.path.join(local_app_data, r"Microsoft\Windows\WER\ReportArchive"),
                 os.path.join(local_app_data, r"Microsoft\Windows\WER\ReportQueue"),
-            ],
+            ] if local_app_data else [],
             "is_recycle_bin": False,
             "supports_age_filter": False
         },
@@ -364,7 +494,7 @@ def get_target_categories():
             "requires_admin": False,
             "paths": [
                 os.path.join(local_app_data, r"Microsoft\Windows\Explorer")
-            ],
+            ] if local_app_data else [],
             "filter_patterns": ["thumbcache_*.db", "iconcache_*.db"],
             "is_recycle_bin": False,
             "supports_age_filter": False
@@ -408,8 +538,10 @@ def get_target_categories():
     return categories
 
 
-def get_recycle_bin_stats():
+def get_recycle_bin_stats() -> tuple[int, int]:
     """Obtiene el tamaño y cantidad de elementos de la papelera de reciclaje."""
+    if sys.platform != "win32" or not hasattr(ctypes, "windll") or not wintypes:
+        return 0, 0
     try:
         class SHQUERYRBINFO(ctypes.Structure):
             _fields_ = [
@@ -444,13 +576,16 @@ def is_path_excluded(file_path: str, exclusions: list) -> bool:
 def is_file_safe_to_clean(file_path: str, supports_age_filter: bool, min_age_hours: int = 24) -> bool:
     """
     Comprueba si un archivo es seguro de eliminar según la regla de antigüedad (Retention filter).
-    Si se creó o modificó hace menos de min_age_hours, se ignora para no dañar instaladores activos.
+    Si se modificó o creó hace menos de min_age_hours, se ignora para no dañar instaladores activos.
     """
     if not supports_age_filter or min_age_hours <= 0:
         return True
     try:
         stat = os.stat(file_path)
-        last_touch = max(stat.st_mtime, stat.st_ctime)
+        if sys.platform == "win32":
+            last_touch = max(stat.st_mtime, stat.st_ctime)
+        else:
+            last_touch = stat.st_mtime
         age_hours = (time.time() - last_touch) / 3600.0
         return age_hours >= min_age_hours
     except Exception:
@@ -460,9 +595,8 @@ def is_file_safe_to_clean(file_path: str, supports_age_filter: bool, min_age_hou
 def scan_category(cat_key: str, cat_info: dict, min_age_hours: int = 24, exclusions: list = None, on_progress=None):
     """
     Escanea una categoría y calcula el espacio y número de archivos recuperables.
-    Aplica filtro de antigüedad y lista de exclusiones.
+    Aplica filtro de antigüedad, exclusiones y protección de junctions.
     Retorna (total_size, total_files, items_list).
-    items_list contiene diccionarios con: {'path', 'size', 'mtime'} para el visor.
     """
     total_size = 0
     total_files = 0
@@ -478,7 +612,7 @@ def scan_category(cat_key: str, cat_info: dict, min_age_hours: int = 24, exclusi
     supports_age = cat_info.get("supports_age_filter", False)
 
     for base_path in paths:
-        if not os.path.exists(base_path):
+        if not base_path or not os.path.exists(base_path):
             continue
 
         try:
@@ -486,7 +620,7 @@ def scan_category(cat_key: str, cat_info: dict, min_age_hours: int = 24, exclusi
                 for pattern in filter_patterns:
                     for file_path in glob.glob(os.path.join(base_path, pattern)):
                         try:
-                            if os.path.isfile(file_path) and not os.path.islink(file_path):
+                            if os.path.isfile(file_path) and not is_safe_link_or_junction(file_path):
                                 if is_path_excluded(file_path, exclusions):
                                     continue
                                 if not is_file_safe_to_clean(file_path, supports_age, min_age_hours):
@@ -501,12 +635,13 @@ def scan_category(cat_key: str, cat_info: dict, min_age_hours: int = 24, exclusi
                             continue
             else:
                 for root, dirs, files in os.walk(base_path, topdown=True):
-                    dirs[:] = [d for d in dirs if not os.path.islink(os.path.join(root, d))]
+                    # Proteger contra carpetas que sean symlinks o junctions
+                    dirs[:] = [d for d in dirs if not is_safe_link_or_junction(os.path.join(root, d))]
 
                     for file in files:
                         file_path = os.path.join(root, file)
                         try:
-                            if os.path.isfile(file_path) and not os.path.islink(file_path):
+                            if os.path.isfile(file_path) and not is_safe_link_or_junction(file_path):
                                 if is_path_excluded(file_path, exclusions):
                                     continue
                                 if not is_file_safe_to_clean(file_path, supports_age, min_age_hours):
@@ -525,8 +660,10 @@ def scan_category(cat_key: str, cat_info: dict, min_age_hours: int = 24, exclusi
     return total_size, total_files, items
 
 
-def empty_recycle_bin():
+def empty_recycle_bin() -> bool:
     """Vacía la papelera de reciclaje silenciosamente."""
+    if sys.platform != "win32" or not hasattr(ctypes, "windll"):
+        return False
     try:
         flags = 0x00000001 | 0x00000002 | 0x00000004
         result = ctypes.windll.shell32.SHEmptyRecycleBinW(None, None, flags)
@@ -538,7 +675,7 @@ def empty_recycle_bin():
 def clean_category(cat_key: str, cat_info: dict, min_age_hours: int = 24, exclusions: list = None, on_item_cleaned=None):
     """
     Elimina archivos de una categoría de forma segura.
-    Omite archivos bloqueados por el sistema sin fallar y respeta el filtro de seguridad.
+    Omite archivos bloqueados por el sistema sin fallar y respeta el filtro de seguridad y junctions.
     Retorna (bytes_liberados, archivos_eliminados, archivos_omitidos).
     """
     freed_bytes = 0
@@ -561,7 +698,7 @@ def clean_category(cat_key: str, cat_info: dict, min_age_hours: int = 24, exclus
     supports_age = cat_info.get("supports_age_filter", False)
 
     for base_path in paths:
-        if not os.path.exists(base_path):
+        if not base_path or not os.path.exists(base_path):
             continue
 
         if filter_patterns:
@@ -574,7 +711,7 @@ def clean_category(cat_key: str, cat_info: dict, min_age_hours: int = 24, exclus
                         skipped_count += 1
                         continue
                     try:
-                        if os.path.isfile(file_path) and not os.path.islink(file_path):
+                        if os.path.isfile(file_path) and not is_safe_link_or_junction(file_path):
                             fsize = os.path.getsize(file_path)
                             os.remove(file_path)
                             freed_bytes += fsize
@@ -596,7 +733,7 @@ def clean_category(cat_key: str, cat_info: dict, min_age_hours: int = 24, exclus
                         skipped_count += 1
                         continue
                     try:
-                        if os.path.isfile(file_path) and not os.path.islink(file_path):
+                        if os.path.isfile(file_path) and not is_safe_link_or_junction(file_path):
                             fsize = os.path.getsize(file_path)
                             os.remove(file_path)
                             freed_bytes += fsize
@@ -610,7 +747,7 @@ def clean_category(cat_key: str, cat_info: dict, min_age_hours: int = 24, exclus
 
                 for directory in dirs:
                     dir_path = os.path.join(root, directory)
-                    if not is_path_excluded(dir_path, exclusions) and not os.path.islink(dir_path):
+                    if not is_path_excluded(dir_path, exclusions) and not is_safe_link_or_junction(dir_path):
                         try:
                             os.rmdir(dir_path)
                         except (PermissionError, OSError):
@@ -619,8 +756,156 @@ def clean_category(cat_key: str, cat_info: dict, min_age_hours: int = 24, exclus
     return freed_bytes, deleted_count, skipped_count
 
 
-def flush_dns():
+def shred_file(file_path: str, passes: int = 1) -> tuple[bool, str]:
+    """
+    Tritura y elimina un archivo de forma segura sobrescribiendo su contenido
+    con bytes aleatorios y ceros antes de desenlazarlo del sistema de archivos.
+    """
+    if not os.path.exists(file_path) or not os.path.isfile(file_path):
+        return False, "El archivo especificado no existe o es un directorio."
+
+    if is_safe_link_or_junction(file_path):
+        return False, "No se permite triturar enlaces simbólicos o junctions."
+
+    try:
+        file_size = os.path.getsize(file_path)
+        if file_size > 0:
+            with open(file_path, "ba+", buffering=0) as f:
+                for p in range(max(1, passes)):
+                    f.seek(0)
+                    remaining = file_size
+                    chunk_size = 64 * 1024
+                    while remaining > 0:
+                        to_write = min(remaining, chunk_size)
+                        f.write(os.urandom(to_write))
+                        remaining -= to_write
+                    f.flush()
+                    os.fsync(f.fileno())
+
+                # Pasada final de ceros
+                f.seek(0)
+                remaining = file_size
+                zero_chunk = b"\x00" * min(file_size, 64 * 1024)
+                while remaining > 0:
+                    to_write = min(remaining, len(zero_chunk))
+                    f.write(zero_chunk[:to_write])
+                    remaining -= to_write
+                f.flush()
+                os.fsync(f.fileno())
+
+        # Ofuscar nombre temporalmente en la tabla de archivos antes de borrar
+        parent_dir = os.path.dirname(file_path)
+        dummy_name = os.path.join(parent_dir, f"__tmp_shred_{int(time.time()*1000)}.tmp")
+        try:
+            os.rename(file_path, dummy_name)
+            os.remove(dummy_name)
+        except OSError:
+            os.remove(file_path)
+
+        return True, "Archivo triturado y destruido con éxito de forma irrecuperable."
+    except Exception as e:
+        return False, f"Error al triturar el archivo: {e}"
+
+
+def find_duplicate_files(target_dir: str, min_size_bytes: int = 1024, max_results: int = 100) -> list[dict]:
+    """
+    Busca archivos duplicados en un directorio objetivo comparando tamaño y hash SHA-256 por bloques.
+    Retorna lista de grupos de duplicados ordenados por espacio desperdiciado.
+    """
+    if not os.path.exists(target_dir) or not os.path.isdir(target_dir):
+        return []
+
+    size_map: dict[int, list[str]] = {}
+
+    # 1. Agrupar por tamaño
+    try:
+        for root, dirs, files in os.walk(target_dir):
+            dirs[:] = [d for d in dirs if not is_safe_link_or_junction(os.path.join(root, d))]
+            for f in files:
+                f_path = os.path.join(root, f)
+                if is_safe_link_or_junction(f_path):
+                    continue
+                try:
+                    sz = os.path.getsize(f_path)
+                    if sz >= min_size_bytes:
+                        size_map.setdefault(sz, []).append(f_path)
+                except (OSError, PermissionError):
+                    continue
+    except Exception:
+        return []
+
+    # 2. Para tamaños con más de 1 archivo, calcular hash SHA-256
+    duplicates = []
+    for sz, paths in size_map.items():
+        if len(paths) < 2:
+            continue
+
+        hash_map: dict[str, list[str]] = {}
+        for path in paths:
+            try:
+                hasher = hashlib.sha256()
+                with open(path, "rb") as f:
+                    while chunk := f.read(65536):
+                        hasher.update(chunk)
+                file_hash = hasher.hexdigest()
+                hash_map.setdefault(file_hash, []).append(path)
+            except (OSError, PermissionError):
+                continue
+
+        for f_hash, dup_paths in hash_map.items():
+            if len(dup_paths) > 1:
+                wasted = sz * (len(dup_paths) - 1)
+                duplicates.append({
+                    "hash": f_hash,
+                    "size": sz,
+                    "size_formatted": format_size(sz),
+                    "wasted_bytes": wasted,
+                    "wasted_formatted": format_size(wasted),
+                    "files": dup_paths
+                })
+                if len(duplicates) >= max_results:
+                    break
+
+    duplicates.sort(key=lambda x: x["wasted_bytes"], reverse=True)
+    return duplicates
+
+
+def export_report(report_data: dict, file_path: str, format_type: str = "json") -> tuple[bool, str]:
+    """Exporta el reporte de escaneo o limpieza en formato JSON o Texto estructurado."""
+    try:
+        with open(file_path, "w", encoding="utf-8") as f:
+            if format_type.lower() == "json":
+                json.dump(report_data, f, indent=4, ensure_ascii=False)
+            else:
+                f.write("=" * 65 + "\n")
+                f.write("      ⚡ PyClean Pro - Reporte de Análisis y Limpieza\n")
+                f.write("=" * 65 + "\n\n")
+                f.write(f"Fecha: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                if "total_freed_formatted" in report_data:
+                    f.write(f"Espacio total liberado: {report_data.get('total_freed_formatted')}\n")
+                    f.write(f"Archivos eliminados: {report_data.get('total_deleted', 0):,}\n")
+                    f.write(f"Archivos protegidos/omitidos: {report_data.get('total_skipped', 0):,}\n\n")
+                elif "total_formatted" in report_data:
+                    f.write(f"Espacio total recuperable: {report_data.get('total_formatted')}\n")
+                    f.write(f"Archivos detectados: {report_data.get('total_files', 0):,}\n\n")
+
+                cats = report_data.get("categories", {})
+                if cats:
+                    f.write("Detalle por categoría:\n")
+                    f.write("-" * 65 + "\n")
+                    for k, v in cats.items():
+                        name = v.get("name", k)
+                        sz = v.get("size_formatted") or v.get("freed_formatted", "0 B")
+                        f.write(f"  • {name:<45}: {sz}\n")
+        return True, f"Reporte guardado con éxito en: {file_path}"
+    except Exception as e:
+        return False, str(e)
+
+
+def flush_dns() -> tuple[bool, str]:
     """Limpia la caché de resolución DNS del sistema de Windows."""
+    if sys.platform != "win32":
+        return False, "ipconfig /flushdns sólo está disponible en Windows."
     try:
         startupinfo = subprocess.STARTUPINFO()
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
@@ -636,19 +921,22 @@ def flush_dns():
         return False, str(e)
 
 
-def optimize_ram():
+def optimize_ram() -> int:
     """
     Optimiza el uso de memoria RAM liberando páginas inactivas
     y reduciendo el Working Set de los procesos del usuario.
     """
     freed_procs = 0
+    if sys.platform != "win32" or not hasattr(ctypes, "windll") or not wintypes:
+        return 0
+
     try:
         PROCESS_QUERY_INFORMATION = 0x0400
         PROCESS_SET_QUOTA = 0x0100
-        
+
         pids = (wintypes.DWORD * 2048)()
         cb_needed = wintypes.DWORD()
-        
+
         if ctypes.windll.psapi.EnumProcesses(
             ctypes.byref(pids),
             ctypes.sizeof(pids),
@@ -678,17 +966,23 @@ def optimize_ram():
 
 # --- Gestor de Programas de Inicio de Windows ---
 
-STARTUP_REG_PATHS = [
-    (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", "Usuario Actual"),
-    (winreg.HKEY_LOCAL_MACHINE, r"Software\Microsoft\Windows\CurrentVersion\Run", "Todo el Sistema (HKLM)"),
-]
+if winreg:
+    STARTUP_REG_PATHS = [
+        (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", "Usuario Actual"),
+        (winreg.HKEY_LOCAL_MACHINE, r"Software\Microsoft\Windows\CurrentVersion\Run", "Todo el Sistema (HKLM)"),
+    ]
+else:
+    STARTUP_REG_PATHS = []
 
-def get_startup_programs():
+
+def get_startup_programs() -> list[dict]:
     """
     Obtiene la lista de programas configurados para iniciar automáticamente con Windows.
     Retorna lista de dicts: [{'name', 'command', 'scope', 'root_key', 'sub_key', 'enabled'}]
     """
     programs = []
+    if not winreg:
+        return programs
 
     for root_key, sub_key, scope in STARTUP_REG_PATHS:
         try:
@@ -739,6 +1033,9 @@ def toggle_startup_program(prog: dict) -> tuple[bool, str]:
     """
     Habilita o deshabilita un programa de inicio moviéndolo entre 'Run' y 'RunDisabled'.
     """
+    if not winreg:
+        return False, "La gestión de programas de inicio sólo está soportada en Windows."
+
     root_key = prog["root_key"]
     name = prog["name"]
     command = prog["command"]
