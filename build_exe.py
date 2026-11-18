@@ -8,9 +8,15 @@ import sys
 import subprocess
 import shutil
 
+try:
+    if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 def build():
     print("=" * 60)
-    print("      ⚡ PyClean Pro - Compilador PyInstaller a .exe")
+    print("      PyClean Pro - Compilador PyInstaller a .exe")
     print("=" * 60)
 
     try:
@@ -44,11 +50,12 @@ def build():
         exe_ext = ".exe" if sys.platform == "win32" else ""
         dist_path = os.path.join(base_dir, "dist", f"PyCleanPro{exe_ext}")
         print("\n" + "=" * 60)
-        print(f"✨ ¡Compilación exitosa!")
-        print(f"📦 Ejecutable disponible en: {dist_path}")
+        print("¡Compilación exitosa!")
+        print(f"Ejecutable disponible en: {dist_path}")
         print("=" * 60)
     else:
-        print(f"\n❌ Error durante la compilación (código {res.returncode}).")
+        print(f"\nError durante la compilación (código {res.returncode}).")
+        sys.exit(res.returncode)
 
 if __name__ == "__main__":
     build()

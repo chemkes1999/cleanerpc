@@ -8,6 +8,12 @@ import sys
 import shutil
 import subprocess
 
+try:
+    if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 def find_iscc():
     """Busca el ejecutable de Inno Setup Compiler (ISCC.exe)."""
     # 1. En PATH
@@ -31,7 +37,7 @@ def find_iscc():
 
 def build_installer():
     print("=" * 65)
-    print("      📦 PyClean Pro - Creador de Instalador de Windows")
+    print("      PyClean Pro - Creador de Instalador de Windows")
     print("=" * 65)
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -46,14 +52,14 @@ def build_installer():
         build_exe_script = os.path.join(base_dir, "build_exe.py")
         res = subprocess.run([sys.executable, build_exe_script])
         if res.returncode != 0:
-            print(f"\n❌ Error al compilar el ejecutable principal. Código: {res.returncode}")
+            print(f"\n[ERROR] Fallo al compilar el ejecutable principal. Código: {res.returncode}")
             return False
 
     # 2. Buscar ISCC
     iscc = find_iscc()
     if not iscc:
         print("\n" + "!" * 65)
-        print("⚠️  AVISO: Inno Setup Compiler (ISCC.exe) no está instalado en este equipo.")
+        print("AVISO: Inno Setup Compiler (ISCC.exe) no está instalado en este equipo.")
         print("!" * 65)
         print("\nPara generar el instalador 'PyCleanPro-Setup.exe' en Windows:")
         print("1. Descarga e instala Inno Setup gratis desde:")
@@ -73,15 +79,17 @@ def build_installer():
     if res.returncode == 0:
         setup_path = os.path.join(dist_dir, "PyCleanPro-Setup.exe")
         print("\n" + "=" * 65)
-        print("✨ ¡Instalador para Windows generado con éxito!")
-        print(f"📦 Instalador listo en: {setup_path}")
+        print("¡Instalador para Windows generado con éxito!")
+        print(f"Instalador listo en: {setup_path}")
         print("=" * 65)
         return True
     else:
-        print(f"\n❌ Error durante la generación del instalador (código {res.returncode}).")
+        print(f"\n[ERROR] Fallo durante la generación del instalador (código {res.returncode}).")
         return False
 
 if __name__ == "__main__":
     success = build_installer()
-    if not success and sys.platform == "win32":
-        input("\nPresiona Enter para continuar...")
+    if not success:
+        if sys.platform == "win32" and not os.environ.get("CI"):
+            input("\nPresiona Enter para continuar...")
+        sys.exit(1)
