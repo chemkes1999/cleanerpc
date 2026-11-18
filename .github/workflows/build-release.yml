@@ -1,4 +1,4 @@
-name: Build & Release PyClean Pro .exe & Installer
+name: Build & Release PyClean Pro (Windows & macOS)
 
 on:
   push:
@@ -10,8 +10,8 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Test & Build Windows Binaries
+  build-windows:
+    name: Test & Build Windows (.exe & Setup)
     runs-on: windows-latest
     env:
       PYTHONUTF8: 1
@@ -81,42 +81,103 @@ jobs:
           & $signtool sign /f $certPath /p $env:CERT_PASS /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 "dist\PyCleanPro-Setup.exe"
           Remove-Item $certPath -Force -ErrorAction SilentlyContinue
 
-      - name: Verify Artifacts & Generate SHA-256 Checksums
+      - name: Verify Windows Binaries
         run: |
           if ((Test-Path "dist\PyCleanPro.exe") -and (Test-Path "dist\PyCleanPro-Setup.exe")) {
             Write-Host "Both PyCleanPro.exe and PyCleanPro-Setup.exe generated successfully!"
-            $hashExe = (Get-FileHash "dist\PyCleanPro.exe" -Algorithm SHA256).Hash.ToLower()
-            $hashSetup = (Get-FileHash "dist\PyCleanPro-Setup.exe" -Algorithm SHA256).Hash.ToLower()
-            @(
-              "$hashExe  PyCleanPro.exe",
-              "$hashSetup  PyCleanPro-Setup.exe"
-            ) | Out-File -FilePath "dist\SHA256SUMS.txt" -Encoding utf8
-            Get-Content "dist\SHA256SUMS.txt"
-            Get-Item "dist\*" | Select-Object Name, Length, LastWriteTime
+            Get-Item "dist\PyCleanPro*.exe" | Select-Object Name, Length, LastWriteTime
           } else {
-            Write-Error "Required binaries not found in dist/!"
+            Write-Error "Required Windows binaries not found in dist/!"
             exit 1
           }
 
-      - name: Upload Artifacts
+      - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: PyCleanPro-Windows-Binaries
           path: |
             dist/PyCleanPro.exe
             dist/PyCleanPro-Setup.exe
-            dist/SHA256SUMS.txt
+
+  build-macos:
+    name: Test & Build macOS (.app & .dmg)
+    runs-on: macos-latest
+    env:
+      PYTHONUTF8: 1
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run Test Suite
+        run: |
+          pytest tests/ -v
+
+      - name: Build macOS App & DMG Installer
+        run: |
+          python build_macos.py
+
+      - name: Verify macOS DMG Artifact
+        run: |
+          if [ -f "dist/PyCleanPro-macOS.dmg" ]; then
+            ls -lh dist/PyCleanPro-macOS.dmg
+          else
+            echo "Required macOS DMG not found in dist/!"
+            exit 1
+          fi
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PyCleanPro-macOS-Binaries
+          path: dist/PyCleanPro-macOS.dmg
+
+  release:
+    name: Publish Multi-OS GitHub Release
+    needs: [build-windows, build-macos]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Windows Binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: PyCleanPro-Windows-Binaries
+          path: release_assets
+
+      - name: Download macOS DMG
+        uses: actions/download-artifact@v4
+        with:
+          name: PyCleanPro-macOS-Binaries
+          path: release_assets
+
+      - name: Generate Unified SHA-256 Checksums
+        run: |
+          cd release_assets
+          sha256sum PyCleanPro.exe PyCleanPro-Setup.exe PyCleanPro-macOS.dmg > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          ls -lh
 
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/PyCleanPro.exe
-            dist/PyCleanPro-Setup.exe
-            dist/SHA256SUMS.txt
+            release_assets/PyCleanPro.exe
+            release_assets/PyCleanPro-Setup.exe
+            release_assets/PyCleanPro-macOS.dmg
+            release_assets/SHA256SUMS.txt
           name: PyClean Pro ${{ github.ref_name }}
           generate_release_notes: true
           draft: false
           prerelease: false
-

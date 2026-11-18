@@ -444,12 +444,15 @@ class PyCleanAPI:
                 si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 subprocess.run(["clip"], input=text.encode("utf-16le"), check=True, startupinfo=si)
                 return True
+            elif sys.platform == "darwin":
+                subprocess.run(["pbcopy"], input=text.encode("utf-8"), check=True)
+                return True
         except Exception:
             pass
         return False
 
     def vault_copy_secret(self, secret_text: str, clear_after_seconds: int = 30):
-        """Copia un secreto al portapapeles de Windows y lo limpia automáticamente tras N segundos."""
+        """Copia un secreto al portapapeles del sistema y lo limpia automáticamente tras N segundos."""
         copied = self._set_system_clipboard(secret_text or "")
         if self._clipboard_timer:
             try:

@@ -277,6 +277,16 @@ def get_system_stats(drive: str = "C:\\") -> dict:
                 stats["ram_used"] = mem.ullTotalPhys - mem.ullAvailPhys
         except Exception:
             pass
+    else:
+        try:
+            import psutil
+            vm = psutil.virtual_memory()
+            stats["ram_load"] = int(round(vm.percent))
+            stats["ram_total"] = int(vm.total)
+            stats["ram_avail"] = int(vm.available)
+            stats["ram_used"] = int(vm.used)
+        except Exception:
+            pass
 
     return stats
 
@@ -307,11 +317,116 @@ def _get_chromium_cache_paths(user_data_path: str) -> list[str]:
     return paths
 
 
+def _get_macos_target_categories() -> dict:
+    """Define y resuelve las rutas seguras de limpieza nativas para macOS."""
+    user_home = str(Path.home())
+    lib_caches = os.path.join(user_home, "Library", "Caches")
+    lib_logs = os.path.join(user_home, "Library", "Logs")
+    app_support = os.path.join(user_home, "Library", "Application Support")
+
+    chrome_paths = _get_chromium_cache_paths(os.path.join(lib_caches, "Google", "Chrome"))
+    chrome_paths.extend(_get_chromium_cache_paths(os.path.join(app_support, "Google", "Chrome")))
+    edge_paths = _get_chromium_cache_paths(os.path.join(lib_caches, "Microsoft Edge"))
+    brave_paths = _get_chromium_cache_paths(os.path.join(lib_caches, "BraveSoftware", "Brave-Browser"))
+    firefox_paths = glob.glob(os.path.join(lib_caches, "Firefox", "Profiles", "*", "cache2"))
+
+    vscode_paths = [
+        os.path.join(app_support, "Code", "Cache"),
+        os.path.join(app_support, "Code", "CachedData"),
+        os.path.join(app_support, "Code", "CachedExtensionVSIXs"),
+    ]
+    dev_paths = [
+        os.path.join(lib_caches, "pip"),
+        os.path.join(user_home, ".npm"),
+        os.path.join(user_home, ".cargo", "registry", "cache"),
+        os.path.join(lib_caches, "Homebrew"),
+        os.path.join(user_home, "Library", "Developer", "Xcode", "DerivedData"),
+    ]
+
+    return {
+        "macos_user_caches": {
+            "name": "Cachés de Usuario (macOS)",
+            "desc": "Archivos temporales y cachés de aplicaciones en ~/Library/Caches",
+            "requires_admin": False,
+            "paths": [lib_caches],
+            "is_recycle_bin": False,
+            "supports_age_filter": True,
+        },
+        "macos_user_logs": {
+            "name": "Registros de Aplicaciones (Logs)",
+            "desc": "Archivos de diagnóstico y registros en ~/Library/Logs",
+            "requires_admin": False,
+            "paths": [lib_logs],
+            "is_recycle_bin": False,
+            "supports_age_filter": True,
+        },
+        "macos_trash": {
+            "name": "Basurero de macOS (Trash)",
+            "desc": "Archivos eliminados en ~/.Trash que aún ocupan espacio",
+            "requires_admin": False,
+            "paths": [os.path.join(user_home, ".Trash")],
+            "is_recycle_bin": False,
+            "supports_age_filter": False,
+        },
+        "browser_chrome": {
+            "name": "Caché de Google Chrome",
+            "desc": "Archivos temporales de navegación de Chrome en macOS",
+            "requires_admin": False,
+            "paths": chrome_paths,
+            "is_recycle_bin": False,
+            "supports_age_filter": False,
+        },
+        "browser_edge": {
+            "name": "Caché de Microsoft Edge",
+            "desc": "Caché web de Microsoft Edge en macOS",
+            "requires_admin": False,
+            "paths": edge_paths,
+            "is_recycle_bin": False,
+            "supports_age_filter": False,
+        },
+        "browser_brave": {
+            "name": "Caché de Brave Browser",
+            "desc": "Caché temporal de navegación de Brave en macOS",
+            "requires_admin": False,
+            "paths": brave_paths,
+            "is_recycle_bin": False,
+            "supports_age_filter": False,
+        },
+        "browser_firefox": {
+            "name": "Caché de Mozilla Firefox",
+            "desc": "Caché de todos los perfiles de Firefox en macOS",
+            "requires_admin": False,
+            "paths": firefox_paths,
+            "is_recycle_bin": False,
+            "supports_age_filter": False,
+        },
+        "vscode_cache": {
+            "name": "Caché de Visual Studio Code",
+            "desc": "Caché de extensiones y datos compilados de VS Code",
+            "requires_admin": False,
+            "paths": vscode_paths,
+            "is_recycle_bin": False,
+            "supports_age_filter": False,
+        },
+        "dev_tools": {
+            "name": "Caché de Desarrollo (Pip, NPM, Cargo, Homebrew, Xcode)",
+            "desc": "Cachés de gestores de paquetes y compilaciones DerivedData de Xcode",
+            "requires_admin": False,
+            "paths": dev_paths,
+            "is_recycle_bin": False,
+            "supports_age_filter": False,
+        },
+    }
+
+
 def get_target_categories() -> dict:
     """
     Define y resuelve las rutas seguras para limpieza en el sistema del usuario actual.
     Incluye multi-perfil, herramientas de desarrollo y soporte ampliado.
     """
+    if sys.platform == "darwin":
+        return _get_macos_target_categories()
+
     local_app_data = os.environ.get("LOCALAPPDATA", "")
     app_data = os.environ.get("APPDATA", "")
     user_temp = os.environ.get("TEMP", os.path.join(local_app_data, "Temp") if local_app_data else "")

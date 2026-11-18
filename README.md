@@ -1,4 +1,4 @@
-# ⚡ PyClean Pro v2.4 - Suite Integral de Optimización, Hardware, Red y Privacidad para Windows
+# ⚡ PyClean Pro v2.5 - Suite Integral de Optimización, Hardware, Red y Privacidad (Windows & macOS)
 
 Una aplicación profesional, moderna, rápida y segura desarrollada en Python para analizar y limpiar archivos residuales, explorar visualmente particiones y carpetas con Treemap interactivo, monitorear procesos/red/DNS en tiempo real, auditar salud S.M.A.R.T. de SSDs y desgaste de batería, gestionar el menú contextual de Windows, almacenar credenciales en una bóveda local cifrada AES-256-GCM y optimizar el rendimiento del sistema operativo.
 
@@ -6,7 +6,13 @@ Una aplicación profesional, moderna, rápida y segura desarrollada en Python pa
 
 ## 🚀 Novedades y Características Principales
 
-### 0. 🔥 Suite Avanzada (Nuevo en v2.4)
+### 🍎 Instalador Oficial para macOS (Nuevo en v2.5)
+- **Instalador `.dmg` nativo (`PyCleanPro-macOS.dmg`):** Contiene el bundle `PyCleanPro.app` (con ícono `.icns` de alta resolución) y acceso directo a `/Applications` para arrastrar e instalar.
+- **Soporte nativo macOS:** Categorías de limpieza para `~/Library/Caches`, `~/Library/Logs`, `~/.Trash`, navegadores, VS Code, Pip/NPM/Cargo/Homebrew y `Xcode DerivedData`, estadísticas de RAM con `psutil` y copia segura al portapapeles con `pbcopy`.
+- **Compilación local en Mac:** Ejecuta `python3 build_macos.py` en macOS para generar `dist/PyCleanPro.app` y `dist/PyCleanPro-macOS.dmg`.
+- **Nota sobre Gatekeeper (apps sin notarización de Apple):** Al abrir `PyCleanPro.app` por primera vez, haz **clic derecho → Abrir** y confirma "Abrir".
+
+### 0. 🔥 Suite Avanzada (v2.4)
 - **📊 Monitor de Procesos y Red (`sys_monitor.py`):** Top procesos por RAM/CPU con protección de procesos críticos de Windows, selector rápido de DNS (Cloudflare, Google, AdGuard, DHCP) y prueba de latencia (ping).
 - **🩺 Salud de Hardware (`hardware_health.py`):** Estado S.M.A.R.T. de discos físicos (SSD/HDD/NVMe), botón de optimización **TRIM** nativo y análisis de desgaste/ciclos de batería en portátiles.
 - **🖱️ Gestor del Menú Contextual (`context_menu.py`):** Lista y permite ocultar/reactivar entradas del clic derecho del Explorador de Windows de forma 100% reversible (`LegacyDisable`).

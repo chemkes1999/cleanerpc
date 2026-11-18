@@ -184,3 +184,22 @@ def test_password_generator_and_strength():
 
     weak = vault.evaluate_password_strength("12345")
     assert weak["score"] == 1
+
+
+# --- 5. Soporte macOS (Categorías y Estadísticas de Sistema) ---
+
+def test_macos_target_categories_and_system_stats(monkeypatch):
+    import cleaner
+
+    monkeypatch.setattr(cleaner.sys, "platform", "darwin")
+    cats = cleaner.get_target_categories()
+    assert "macos_user_caches" in cats
+    assert "macos_user_logs" in cats
+    assert "macos_trash" in cats
+    assert "dev_tools" in cats
+    assert any("Library/Caches" in p.replace("\\", "/") for p in cats["macos_user_caches"]["paths"])
+
+    stats = cleaner.get_system_stats()
+    assert stats["ram_total"] > 0
+    assert 0 <= stats["ram_load"] <= 100
+
