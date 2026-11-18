@@ -34,16 +34,27 @@ function formatSize(bytes) {
   return `${size.toFixed(2)} ${units[i]}`;
 }
 
-// Inicialización de la aplicación
-window.addEventListener("pywebviewready", initApp);
-// Fallback para testing en navegador si no está pywebview
+let appInitialized = false;
+
+function startApp() {
+  if (appInitialized) return;
+  appInitialized = true;
+  initApp();
+}
+
+if (window.pywebview) {
+  startApp();
+} else {
+  window.addEventListener("pywebviewready", startApp);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   setTimeout(() => {
-    if (!window.pywebview) {
+    if (!appInitialized && !window.pywebview) {
       console.warn("PyWebView no detectado. Modo desarrollo activo.");
       initMockApp();
     }
-  }, 600);
+  }, 800);
 });
 
 async function initApp() {
@@ -52,6 +63,8 @@ async function initApp() {
   // Registrar callback para logs desde Python
   window.onPyLog = (msg, tag) => addLog(msg, tag);
 
+  setupEventListeners();
+
   try {
     const state = await window.pywebview.api.get_initial_state(AppState.selectedDrive);
     applyInitialState(state);
@@ -59,7 +72,6 @@ async function initApp() {
     addLog(`Error al inicializar estado: ${err}`, "error");
   }
 
-  setupEventListeners();
   runIntroAnimations();
 }
 
@@ -1013,6 +1025,13 @@ function setupEventListeners() {
           dupResults.appendChild(item);
         });
       }
+    } catch (err) {
+      btnRunDup.disabled = false;
+      dupStatus.textContent = `Error auditando duplicados: ${err}`;
+      addLog(`Fallo al buscar duplicados: ${err}`, "error");
+    }
+  });
+
   // --- v2.2: Eventos del Desinstalador de Aplicaciones ---
   const uninstallerSearch = document.getElementById("uninstaller-search");
   if (uninstallerSearch) {
