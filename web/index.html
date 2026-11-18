@@ -21,7 +21,7 @@
         </div>
         <div class="brand-text">
           <h2>PyClean <span class="highlight">Pro</span></h2>
-          <span class="version">v2.1 • Suite Pro</span>
+          <span class="version">v2.2 • Suite Pro</span>
         </div>
       </div>
 
@@ -51,6 +51,22 @@
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
           </svg>
           <span>Inicio Rápido</span>
+        </button>
+
+        <button class="nav-item" data-tab="tab-uninstaller">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+            <line x1="12" y1="22.08" x2="12" y2="12"/>
+          </svg>
+          <span>Desinstalador</span>
+        </button>
+
+        <button class="nav-item" data-tab="tab-privacy">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          <span>Privacidad</span>
         </button>
 
         <button class="nav-item" data-tab="tab-files">
@@ -267,6 +283,89 @@
           </div>
         </section>
 
+        <!-- Vista: Desinstalador Limpio de Aplicaciones -->
+        <section class="tab-view" id="tab-uninstaller">
+          <div class="view-header">
+            <div>
+              <h2>Desinstalador Limpio de Aplicaciones</h2>
+              <p>Desinstala programas de Windows y rastrea carpetas residuales huérfanas en AppData y ProgramData.</p>
+            </div>
+            <div class="view-tools">
+              <input type="text" id="uninstaller-search" placeholder="🔍 Buscar aplicación..." class="modern-input" style="width: 220px;">
+              <button class="btn-tool" id="btn-refresh-apps">🔄 Refrescar</button>
+            </div>
+          </div>
+
+          <div class="startup-table-card">
+            <div class="table-container" style="max-height: 480px;">
+              <table class="modern-table">
+                <thead>
+                  <tr>
+                    <th>Aplicación</th>
+                    <th>Editor / Fabricante</th>
+                    <th>Versión</th>
+                    <th>Tamaño Est.</th>
+                    <th style="text-align: right;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="uninstaller-tbody">
+                  <tr><td colspan="5" class="table-loading">Cargando aplicaciones instaladas...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Tarjeta de Residuos Huérfanos -->
+          <div class="card" id="leftovers-card" style="display: none; margin-top: 18px; border-color: rgba(245, 158, 11, 0.4);">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <h3 style="color: var(--warning);">⚠️ Carpetas Residuales Detectadas</h3>
+                <span class="hint" id="leftovers-app-title">Residuos huérfanos encontrados</span>
+              </div>
+              <button class="btn-primary" id="btn-delete-leftovers" style="background: var(--danger); border-color: var(--danger);">Eliminar Residuos</button>
+            </div>
+            <div class="dup-results-container" id="leftovers-list" style="margin-top: 10px;"></div>
+          </div>
+        </section>
+
+        <!-- Vista: Privacidad y Telemetría -->
+        <section class="tab-view" id="tab-privacy">
+          <div class="view-header">
+            <div>
+              <h2>Privacidad y Telemetría de Windows</h2>
+              <p>Audita y desactiva servicios diagnósticos en segundo plano y políticas de recolección de datos.</p>
+            </div>
+            <div class="view-tools">
+              <button class="btn-tool" id="btn-refresh-privacy">🔄 Actualizar Estado</button>
+            </div>
+          </div>
+
+          <div class="settings-grid">
+            <div class="card setting-card">
+              <h3>Servicios de Diagnóstico y Rastreo</h3>
+              <p class="setting-desc">Servicios del sistema operativo que recopilan eventos de uso y reportes de error.</p>
+              
+              <div id="telemetry-services-list" style="display: flex; flex-direction: column; gap: 12px; margin-top: 14px;">
+                <div class="empty-state">Cargando estado de servicios de Windows...</div>
+              </div>
+            </div>
+
+            <div class="card setting-card">
+              <h3>Política de Recolección de Datos (DataCollection)</h3>
+              <p class="setting-desc">Configuración en Registro para restringir el nivel de telemetría a mínimo/deshabilitado.</p>
+              
+              <div class="tool-status-box" id="policy-telemetry-status" style="margin: 14px 0;">
+                Estado: Verificando política de registro...
+              </div>
+
+              <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button class="btn-primary" id="btn-disable-telemetry" style="background: var(--warning); border-color: var(--warning);">Mitigar Telemetría</button>
+                <button class="btn-tool" id="btn-restore-telemetry">Restablecer Valores</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- Vista 4: Archivos Más Pesados -->
         <section class="tab-view" id="tab-files">
           <div class="view-header">
@@ -334,6 +433,29 @@
                 <div class="empty-state">No hay carpetas excluidas actualmente.</div>
               </div>
             </div>
+
+            <!-- Programador de Mantenimiento Automático -->
+            <div class="card setting-card">
+              <h3>Mantenimiento Automático (Task Scheduler)</h3>
+              <p class="setting-desc">Programa la ejecución periódica y silenciosa de PyClean Pro en Windows.</p>
+
+              <div style="display: flex; align-items: center; justify-content: space-between; margin: 14px 0;">
+                <span id="scheduler-status-text" style="color: var(--text-muted);">Estado: Desactivado</span>
+                <label class="switch">
+                  <input type="checkbox" id="toggle-scheduler">
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div class="tool-input-row">
+                <label for="scheduler-frequency" style="font-size: 12px; color: var(--text-muted);">Frecuencia:</label>
+                <select id="scheduler-frequency" class="modern-input" style="width: 200px;">
+                  <option value="weekly">Semanal (Domingos 03:00 AM)</option>
+                  <option value="daily">Diario (03:00 AM)</option>
+                </select>
+                <button class="btn-tool" id="btn-save-scheduler">Guardar Tarea</button>
+              </div>
+            </div>
           </div>
 
           <div class="settings-footer">
@@ -342,12 +464,12 @@
           </div>
         </section>
 
-        <!-- Vista 6: Herramientas Avanzadas (Triturador & Duplicados) -->
+        <!-- Vista 6: Herramientas Avanzadas (Triturador, Duplicados & Descargas) -->
         <section class="tab-view" id="tab-tools">
           <div class="view-header">
             <div>
               <h2>Herramientas Avanzadas del Sistema</h2>
-              <p>Trituración irrecuperable de datos confidenciales y auditoría de duplicados.</p>
+              <p>Trituración irrecuperable de datos confidenciales, duplicados y auditoría de descargas.</p>
             </div>
           </div>
 
@@ -409,6 +531,37 @@
                 </div>
                 <div class="tool-status-box" id="dup-status">Selecciona una carpeta para iniciar la búsqueda.</div>
                 <div class="dup-results-container" id="dup-results" style="display: none;"></div>
+              </div>
+            </div>
+
+            <!-- Herramienta 3: Auditor de Descargas Pesadas y Antiguas -->
+            <div class="tool-card">
+              <div class="tool-card-header">
+                <div class="tool-icon" style="background: rgba(16, 185, 129, 0.15); color: #34D399; border: 1px solid rgba(16, 185, 129, 0.3);">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                </div>
+                <div>
+                  <h3>Auditor de Descargas Olvidadas</h3>
+                  <p>Detecta instaladores (.iso, .exe, .msi, .zip) antiguos en la carpeta Descargas.</p>
+                </div>
+              </div>
+
+              <div class="tool-body">
+                <div class="tool-input-row">
+                  <label for="downloads-age-select" style="font-size: 12px; color: var(--text-muted);">Antigüedad:</label>
+                  <select id="downloads-age-select" class="modern-input" style="width: 150px;">
+                    <option value="30">Más de 30 días</option>
+                    <option value="60">Más de 60 días</option>
+                    <option value="90">Más de 90 días</option>
+                  </select>
+                  <button class="btn-primary" id="btn-audit-downloads">Auditar Descargas</button>
+                </div>
+                <div class="tool-status-box" id="downloads-status">Audita instaladores antiguos para recuperar espacio en disco.</div>
+                <div class="dup-results-container" id="downloads-results" style="display: none;"></div>
               </div>
             </div>
           </div>

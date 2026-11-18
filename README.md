@@ -1,6 +1,6 @@
-# ⚡ PyClean Pro v2.1 - Suite de Optimización, Limpieza y Privacidad para Windows
+# ⚡ PyClean Pro v2.2 - Suite Integral de Optimización, Mantenimiento y Privacidad para Windows
 
-Una aplicación profesional, moderna, rápida y segura desarrollada en Python para analizar, limpiar archivos residuales, auditar el arranque de Windows, triturar archivos confidenciales, encontrar duplicados y optimizar el rendimiento del sistema operativo.
+Una aplicación profesional, moderna, rápida y segura desarrollada en Python para analizar y limpiar archivos residuales, auditar y desinstalar aplicaciones sin dejar restos huérfanos, programar mantenimientos automáticos con Windows Task Scheduler, mitigar la telemetría del sistema, triturar archivos confidenciales de forma irrecuperable y optimizar el rendimiento del sistema operativo.
 
 ---
 
@@ -30,22 +30,34 @@ Una aplicación profesional, moderna, rápida y segura desarrollada en Python pa
 
 ---
 
-### 2. Dashboard Gráfico Interactivo y Moderno (Animaciones GSAP + PyWebView)
+### 2. Desinstalador Limpio y Mantenimiento Avanzado (Nuevo en v2.2)
+- **📦 Desinstalador Limpio de Aplicaciones con Escáner de Residuos:**
+  - Cataloga todas las aplicaciones instaladas en Windows desde el Registro (`HKLM`, `HKCU` y `Wow6432Node`).
+  - Permite buscar en tiempo real, visualizar tamaño estimado y ejecutar desinstalaciones nativas.
+  - **Detección de Residuos Huérfanos:** Tras desinstalar, rastrea carpetas huérfanas en `%APPDATA%`, `%LOCALAPPDATA%` y `%PROGRAMDATA%` para eliminarlas de forma definitiva.
+- **⏰ Programador de Mantenimiento Automático (Task Scheduler):**
+  - Configura una tarea programada nativa en Windows (`schtasks`) para ejecutar la optimización silenciosa periódica (semanal o diaria) sin intervención del usuario.
+- **🛡️ Optimizador de Telemetría y Privacidad:**
+  - Audita y permite pausar o desactivar servicios de recolección diagnóstica (`DiagTrack`, `dmwappushservice`, `WerSvc`) y configurar la directiva `DataCollection` en el Registro.
+- **📂 Auditor de Descargas Pesadas y Antiguas:**
+  - Identifica instaladores (`.iso`, `.exe`, `.msi`, `.zip`) en la carpeta `Descargas` con más de 30, 60 o 90 días sin abrir para recuperar gigabytes rápidamente.
+
+---
+
+### 3. Dashboard Gráfico Interactivo y Moderno (Animaciones GSAP + PyWebView)
 - **Interfaz Moderna con GSAP (GreenSock Animation Platform):**
   - Gráficos SVG circulares animados con easing dinámico para Disco y Memoria RAM.
   - Contadores de bytes y archivos animados en tiempo real (`0 B` -> `XX.XX GB`).
   - Banner dinámico de advertencia cuando hay navegadores en ejecución.
-  - Pestaña de **Herramientas Avanzadas** (Triturador de archivos y Buscador de duplicados).
+  - Pestañas de **Desinstalador**, **Privacidad**, **Herramientas Avanzadas** (Triturador y Duplicados) y **Ajustes**.
   - Botón de **Exportación de Informes** de diagnóstico a formatos `.json` o `.txt`.
-  - Transiciones suaves entre pestañas y animaciones de entrada fluidas.
-  - Barra de progreso interactiva con efecto de resplandor.
   - Consola de logs integrada y colapsable con auto-scroll y etiquetas cromáticas.
 - **Soporte Multi-Disco:** Selector dinámico de unidades (`C:\`, `D:\`, etc.) con estadísticas en gigabytes y porcentaje en tiempo real.
 - **Compatibilidad Dual:** Incluye tanto la interfaz moderna con GSAP como la interfaz gráfica clásica en Tkinter (`--legacy-gui`).
 
 ---
 
-### 3. Herramientas Avanzadas de Rendimiento y Privacidad
+### 4. Herramientas Avanzadas de Rendimiento y Seguridad
 - **🗑️ Triturador Seguro de Archivos (File Shredder):**
   - Sobrescribe el contenido de archivos confidenciales con bytes aleatorios (`os.urandom`) y ceros antes de desenlazarlos del sistema de archivos, impidiendo su recuperación forense (soporta 1 pasada rápida o 3 pasadas estándar DoD 5220.22-M).
 - **🔍 Buscador de Archivos Duplicados (Duplicate Finder):**
@@ -60,10 +72,11 @@ Una aplicación profesional, moderna, rápida y segura desarrollada en Python pa
 
 ---
 
-### 4. Estabilidad, Testing y Empaquetado
+### 5. Estabilidad, Testing y CI/CD Automático
 - **Cero bloqueos en desarrollo:** Compatibilidad multiplataforma y stubs para `winreg`/`ctypes` que permiten ejecutar tests y desarrollo en cualquier sistema operativo.
-- **Suite de Pruebas Automatizadas:** 7 tests unitarios en `tests/` que validan seguridad, cálculo de antigüedad, triturador y duplicados.
+- **Suite de Pruebas Automatizadas:** 10 tests unitarios en `tests/` que validan seguridad, cálculo de antigüedad, triturador, duplicados, auditoría de descargas y fallbacks.
 - **Compilador a Ejecutable Portable (.exe):** Script incluido con PyInstaller (`build_exe.py` / `build.bat`) para generar un único ejecutable sin necesidad de instalar Python en el equipo de destino.
+- **GitHub Actions CI/CD ([`.github/workflows/build-release.yml`](file:///.github/workflows/build-release.yml)):** Flujo automático en `windows-latest` que compila el binario `PyCleanPro.exe` y lo adjunta como asset descargable en los Releases de GitHub al crear tags `v*`.
 
 ---
 
@@ -93,6 +106,18 @@ python main.py --dry-run
 
 # Limpiar archivos basura respetando reglas de seguridad:
 python main.py --clean
+
+# Listar aplicaciones instaladas en el sistema:
+python main.py --apps
+
+# Auditar instaladores antiguos en Descargas (> 30 días):
+python main.py --downloads-audit 30
+
+# Activar tarea semanal de mantenimiento automático:
+python main.py --schedule on
+
+# Mitigar servicios de telemetría y diagnósticos de Windows:
+python main.py --privacy on
 
 # Triturar y destruir un archivo confidencial de forma irrecuperable:
 python main.py --shred C:\Ruta\archivo_secreto.docx --shred-passes 3
@@ -144,18 +169,19 @@ Para empaquetar la aplicación en un único archivo ejecutable `.exe` que no req
 
 Para ejecutar la suite de pruebas unitarias:
 ```bash
-pytest tests/
+pytest tests/ -v
 ```
 
 ---
 
 ## 📁 Estructura del Proyecto
 
-- [`cleaner.py`](file:///home/antigravity/chemkes1999/cleanerpc/cleaner.py): Motor central de análisis, limpieza segura, llamadas Win32 API, filtro de antigüedad, protección de junctions, triturador seguro, detector de duplicados y auditor de procesos.
-- [`main.py`](file:///home/antigravity/chemkes1999/cleanerpc/main.py): Punto de entrada con soporte completo para GUI y CLI (incluyendo `--shred`, `--duplicates`, `--export`, etc.).
+- [`cleaner.py`](file:///home/antigravity/chemkes1999/cleanerpc/cleaner.py): Motor central de análisis, limpieza segura, llamadas Win32 API, filtro de antigüedad, protección de junctions, triturador seguro, detector de duplicados, desinstalador, auditor de descargas y telemetría.
+- [`main.py`](file:///home/antigravity/chemkes1999/cleanerpc/main.py): Punto de entrada con soporte completo para GUI y CLI (incluyendo `--apps`, `--downloads-audit`, `--schedule`, `--privacy`, `--shred`, etc.).
 - [`web_gui.py`](file:///home/antigravity/chemkes1999/cleanerpc/web_gui.py): API PyWebView que conecta el frontend con el motor Python.
 - [`web/`](file:///home/antigravity/chemkes1999/cleanerpc/web): Interfaz moderna (HTML, CSS y JS con animaciones fluidas GSAP).
-- [`tests/`](file:///home/antigravity/chemkes1999/cleanerpc/tests): Suite de pruebas unitarias automatizadas (`test_cleaner.py`).
+- [`tests/`](file:///home/antigravity/chemkes1999/cleanerpc/tests): Suite de 10 pruebas unitarias automatizadas (`test_cleaner.py`).
+- [`.github/workflows/build-release.yml`](file:///home/antigravity/chemkes1999/cleanerpc/.github/workflows/build-release.yml): Pipeline de CI/CD para compilación de `.exe` y releases en GitHub.
 - [`build_exe.py`](file:///home/antigravity/chemkes1999/cleanerpc/build_exe.py) / [`build.bat`](file:///home/antigravity/chemkes1999/cleanerpc/build.bat): Compilador a binario `.exe` único vía PyInstaller.
 - [`gui.py`](file:///home/antigravity/chemkes1999/cleanerpc/gui.py) / [`charts.py`](file:///home/antigravity/chemkes1999/cleanerpc/charts.py): Interfaz clásica basada en Tkinter (`--legacy-gui`).
 - [`requirements.txt`](file:///home/antigravity/chemkes1999/cleanerpc/requirements.txt): Dependencias de producción.

@@ -229,6 +229,72 @@ class PyCleanAPI:
             return {"success": False, "error": str(e)}
         return {"success": False, "error": "Ruta no encontrada"}
 
+    # --- v2.2: Desinstalador Limpio de Aplicaciones ---
+    def get_installed_apps(self):
+        """Obtiene la lista de programas instalados."""
+        return cleaner.get_installed_apps()
+
+    def run_uninstaller(self, uninstall_cmd: str):
+        """Ejecuta el desinstalador de una aplicación."""
+        ok, msg = cleaner.run_uninstaller(uninstall_cmd)
+        return {"success": ok, "message": msg}
+
+    def find_app_leftovers(self, app_name: str):
+        """Busca carpetas residuales huérfanas tras desinstalar."""
+        leftovers = cleaner.find_app_leftovers(app_name)
+        return {"leftovers": leftovers}
+
+    def delete_leftovers(self, paths: list):
+        """Elimina carpetas residuales huérfanas confirmadas."""
+        deleted = []
+        failed = []
+        for p in paths:
+            try:
+                if os.path.exists(p) and os.path.isdir(p) and not cleaner.is_safe_link_or_junction(p):
+                    cleaner.shutil.rmtree(p, ignore_errors=True)
+                    deleted.append(p)
+                else:
+                    failed.append(p)
+            except Exception:
+                failed.append(p)
+        return {"deleted": deleted, "failed": failed}
+
+    # --- v2.2: Programador de Tareas Automático ---
+    def get_scheduled_task_status(self):
+        """Consulta el estado de la tarea programada."""
+        return cleaner.get_scheduled_task_status()
+
+    def set_scheduled_task(self, enabled: bool, frequency: str = "weekly"):
+        """Configura la tarea programada en Windows."""
+        ok, msg = cleaner.set_scheduled_task(enabled, frequency=frequency)
+        return {"success": ok, "message": msg}
+
+    # --- v2.2: Optimizador de Telemetría y Privacidad ---
+    def get_telemetry_status(self):
+        """Obtiene el estado de los servicios de telemetría."""
+        return cleaner.get_telemetry_status()
+
+    def toggle_telemetry(self, disable: bool):
+        """Activa o mitiga la telemetría."""
+        ok, msg = cleaner.toggle_telemetry(disable)
+        return {"success": ok, "message": msg}
+
+    # --- v2.2: Auditor de Descargas Antiguas ---
+    def audit_old_downloads(self, days: int = 30):
+        """Audita archivos pesados y antiguos en la carpeta de Descargas."""
+        items = cleaner.audit_old_downloads(min_age_days=days)
+        return {"downloads": items}
+
+    def delete_download_file(self, file_path: str):
+        """Elimina un archivo de descarga antiguo."""
+        try:
+            if os.path.exists(file_path) and os.path.isfile(file_path):
+                os.remove(file_path)
+                return {"success": True, "message": "Archivo de descarga eliminado."}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+        return {"success": False, "message": "Archivo no encontrado."}
+
 
 def run_web_gui():
     """Lanza la interfaz moderna PyWebView + GSAP."""

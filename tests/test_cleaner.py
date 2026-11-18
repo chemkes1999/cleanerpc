@@ -126,3 +126,72 @@ def test_export_report():
             content = f.read()
             assert "PyClean Pro" in content
             assert "150.00 MB" in content
+
+
+def test_audit_old_downloads(monkeypatch):
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Simular carpeta Downloads
+        monkeypatch.setattr(cleaner.Path, "home", lambda: temp_dir)
+        downloads_dir = os.path.join(temp_dir, "Downloads")
+        os.makedirs(downloads_dir)
+
+        old_iso = os.path.join(downloads_dir, "ubuntu-22.04.iso")
+        new_msi = os.path.join(downloads_dir, "installer_new.msi")
+        old_txt = os.path.join(downloads_dir, "notes.txt")
+
+        with open(old_iso, "wb") as f:
+            f.write(b"0" * 1024)
+        with open(new_msi, "wb") as f:
+            f.write(b"0" * 1024)
+        with open(old_txt, "wb") as f:
+            f.write(b"0" * 1024)
+
+        # Modificar mtime del archivo viejo a hace 40 días
+        old_time = time.time() - (40 * 86400)
+        os.utime(old_iso, (old_time, old_time))
+        os.utime(old_txt, (old_time, old_time))
+
+        results = cleaner.audit_old_downloads(min_age_days=30)
+        # Debe incluir old_iso, pero no new_msi (<30 días) ni old_txt (no es instalador)
+        assert len(results) == 1
+        assert results[0]["name"] == "ubuntu-22.04.iso"
+        assert results[0]["days_old"] >= 39
+
+
+def test_find_app_leftovers(monkeypatch):
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Mock de variables de entorno para AppData
+        local_app = os.path.join(temp_dir, "Local")
+        roaming_app = os.path.join(temp_dir, "Roaming")
+        os.makedirs(local_app)
+        os.makedirs(roaming_app)
+
+        monkeypatch.setenv("LOCALAPPDATA", local_app)
+        monkeypatch.setenv("APPDATA", roaming_app)
+
+        # Crear carpetas de prueba
+        target_leftover = os.path.join(local_app, "SpotifyOldApp")
+        generic_folder = os.path.join(local_app, "Microsoft")
+        other_folder = os.path.join(roaming_app, "Discord")
+        os.makedirs(target_leftover)
+        os.makedirs(generic_folder)
+        os.makedirs(other_folder)
+
+        found = cleaner.find_app_leftovers("Spotify")
+        assert target_leftover in found
+        assert generic_folder not in found
+        assert other_folder not in found
+
+
+def test_v22_fallbacks():
+    # En entornos no Windows, las llamadas retornan estados seguros en lugar de crashear
+    task_stat = cleaner.get_scheduled_task_status()
+    assert isinstance(task_stat, dict)
+    assert "enabled" in task_stat
+
+    tel_stat = cleaner.get_telemetry_status()
+    assert isinstance(tel_stat, dict)
+    assert "services" in tel_stat
+
+    apps = cleaner.get_installed_apps()
+    assert isinstance(apps, list)

@@ -1059,3 +1059,329 @@ def toggle_startup_program(prog: dict) -> tuple[bool, str]:
         return False, "Se requieren permisos de Administrador para modificar este programa."
     except Exception as e:
         return False, str(e)
+
+
+# ==============================================================================
+# PyClean Pro v2.2 - Desinstalador, Programador, Telemetría y Auditor de Descargas
+# ==============================================================================
+
+UNINSTALL_REG_KEYS = [
+    (winreg.HKEY_LOCAL_MACHINE, r"Software\Microsoft\Windows\CurrentVersion\Uninstall"),
+    (winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall"),
+    (winreg.HKEY_LOCAL_MACHINE, r"Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+] if winreg else []
+
+def get_installed_apps() -> list[dict]:
+    """
+    Obtiene la lista de programas instalados en Windows desde el Registro.
+    Retorna lista de dicts: [{'name', 'version', 'publisher', 'install_date', 'size_bytes', 'size_formatted', 'uninstall_string', 'quiet_uninstall_string'}]
+    """
+    apps = []
+    if not winreg:
+        return apps
+
+    seen_names = set()
+    for root_key, sub_key in UNINSTALL_REG_KEYS:
+        try:
+            with winreg.OpenKey(root_key, sub_key, 0, winreg.KEY_READ) as key:
+                num_subkeys, _, _ = winreg.QueryInfoKey(key)
+                for i in range(num_subkeys):
+                    try:
+                        subkey_name = winreg.EnumKey(key, i)
+                        with winreg.OpenKey(key, subkey_name, 0, winreg.KEY_READ) as app_key:
+                            def get_val(val_name, default=""):
+                                try:
+                                    v, _ = winreg.QueryValueEx(app_key, val_name)
+                                    return v
+                                except OSError:
+                                    return default
+
+                            name = str(get_val("DisplayName", "")).strip()
+                            if not name:
+                                continue
+
+                            system_component = get_val("SystemComponent", 0)
+                            parent_key = get_val("ParentKeyName", "")
+                            if system_component == 1 or parent_key:
+                                continue
+
+                            if name.lower() in seen_names:
+                                continue
+                            seen_names.add(name.lower())
+
+                            version = str(get_val("DisplayVersion", ""))
+                            publisher = str(get_val("Publisher", ""))
+                            install_date = str(get_val("InstallDate", ""))
+                            size_kb = get_val("EstimatedSize", 0)
+                            uninstall_str = str(get_val("UninstallString", ""))
+                            quiet_uninstall = str(get_val("QuietUninstallString", ""))
+
+                            size_bytes = (size_kb * 1024) if isinstance(size_kb, int) and size_kb > 0 else 0
+
+                            apps.append({
+                                "name": name,
+                                "version": version,
+                                "publisher": publisher,
+                                "install_date": install_date,
+                                "size_bytes": size_bytes,
+                                "size_formatted": format_size(size_bytes) if size_bytes > 0 else "Desconocido",
+                                "uninstall_string": uninstall_str,
+                                "quiet_uninstall_string": quiet_uninstall
+                            })
+                    except (OSError, PermissionError):
+                        continue
+        except Exception:
+            pass
+
+    apps.sort(key=lambda x: x["name"].lower())
+    return apps
+
+
+def run_uninstaller(uninstall_string: str) -> tuple[bool, str]:
+    """Ejecuta el comando oficial de desinstalación de un programa."""
+    if not uninstall_string.strip():
+        return False, "Comando de desinstalación vacío o no disponible."
+    if sys.platform != "win32":
+        return False, "La desinstalación sólo está soportada en Windows."
+
+    try:
+        subprocess.Popen(uninstall_string, shell=True)
+        return True, "Asistente de desinstalación iniciado."
+    except Exception as e:
+        return False, f"Error iniciando desinstalador: {e}"
+
+
+def find_app_leftovers(app_name: str) -> list[str]:
+    """
+    Busca carpetas residuales huérfanas en AppData y ProgramData relacionadas con el nombre de la app.
+    """
+    if not app_name or len(app_name.strip()) < 3:
+        return []
+
+    clean_name = "".join(c for c in app_name.lower() if c.isalnum() or c in (" ", "-", "_")).strip()
+    leftovers = []
+
+    candidates_dirs = [
+        os.environ.get("LOCALAPPDATA", ""),
+        os.environ.get("APPDATA", ""),
+        os.environ.get("ProgramData", r"C:\ProgramData"),
+    ]
+
+    protected_names = {"microsoft", "windows", "temp", "programs", "packages", "system", "temp", "common"}
+
+    for base in candidates_dirs:
+        if not base or not os.path.exists(base):
+            continue
+        try:
+            for item in os.listdir(base):
+                item_path = os.path.join(base, item)
+                if os.path.isdir(item_path) and not is_safe_link_or_junction(item_path):
+                    item_clean = "".join(c for c in item.lower() if c.isalnum() or c in (" ", "-", "_")).strip()
+                    if item.lower() in protected_names:
+                        continue
+                    if clean_name == item_clean or (len(clean_name) >= 4 and clean_name in item_clean):
+                        leftovers.append(item_path)
+        except (PermissionError, OSError):
+            continue
+
+    return leftovers
+
+
+TASK_NAME = "PyCleanPro_AutoClean"
+
+def get_scheduled_task_status() -> dict:
+    """Consulta si la tarea de mantenimiento automático está programada en Windows."""
+    if sys.platform != "win32":
+        return {"exists": False, "enabled": False, "task_name": TASK_NAME, "message": "Solo disponible en Windows."}
+
+    try:
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        res = subprocess.run(
+            ["schtasks", "/query", "/tn", TASK_NAME, "/fo", "CSV", "/nh"],
+            capture_output=True,
+            text=True,
+            startupinfo=startupinfo,
+            check=False,
+            encoding="utf-8",
+            errors="ignore"
+        )
+        if res.returncode == 0 and TASK_NAME.lower() in res.stdout.lower():
+            return {"exists": True, "enabled": True, "task_name": TASK_NAME}
+        return {"exists": False, "enabled": False, "task_name": TASK_NAME}
+    except Exception as e:
+        return {"exists": False, "enabled": False, "error": str(e)}
+
+
+def set_scheduled_task(enabled: bool, frequency: str = "weekly") -> tuple[bool, str]:
+    """Habilita o deshabilita la tarea automática de limpieza en Windows Task Scheduler."""
+    if sys.platform != "win32":
+        return False, "El Programador de Tareas sólo está disponible en Windows."
+
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+    if not enabled:
+        try:
+            res = subprocess.run(
+                ["schtasks", "/delete", "/tn", TASK_NAME, "/f"],
+                capture_output=True,
+                text=True,
+                startupinfo=startupinfo,
+                check=False
+            )
+            return True, "Tarea de mantenimiento automático eliminada con éxito."
+        except Exception as e:
+            return False, f"Error al eliminar la tarea: {e}"
+
+    if getattr(sys, "frozen", False):
+        exe_path = f'"{sys.executable}"'
+        task_action = f'{exe_path} --clean --all'
+    else:
+        script = os.path.abspath(os.path.join(os.path.dirname(__file__), "main.py"))
+        task_action = f'"{sys.executable}" "{script}" --clean --all'
+
+    sc_flag = "weekly" if frequency == "weekly" else "daily"
+    cmd = [
+        "schtasks", "/create",
+        "/tn", TASK_NAME,
+        "/tr", task_action,
+        "/sc", sc_flag,
+        "/st", "03:00",
+        "/f",
+        "/rl", "HIGHEST"
+    ]
+    if sc_flag == "weekly":
+        cmd.extend(["/d", "SUN"])
+
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, startupinfo=startupinfo, check=False)
+        if res.returncode == 0:
+            freq_label = "cada domingo a las 03:00 AM" if sc_flag == "weekly" else "diariamente a las 03:00 AM"
+            return True, f"Tarea programada configurada con éxito ({freq_label})."
+        return False, res.stderr.strip() or res.stdout.strip()
+    except Exception as e:
+        return False, str(e)
+
+
+TELEMETRY_SERVICES = [
+    ("DiagTrack", "Experiencias de telemetría y diagnósticos de Windows"),
+    ("dmwappushservice", "Servicio de enrutamiento WAP Push"),
+    ("WerSvc", "Servicio de Informes de Errores de Windows (WER)"),
+]
+
+def get_telemetry_status() -> dict:
+    """Verifica el estado de los servicios de telemetría y recolección de diagnósticos."""
+    services_info = []
+    telemetry_disabled = False
+
+    if sys.platform == "win32":
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        for srv_name, desc in TELEMETRY_SERVICES:
+            try:
+                res = subprocess.run(
+                    ["sc", "query", srv_name],
+                    capture_output=True,
+                    text=True,
+                    startupinfo=startupinfo,
+                    check=False
+                )
+                running = "RUNNING" in res.stdout
+                services_info.append({"service": srv_name, "desc": desc, "running": running})
+            except Exception:
+                services_info.append({"service": srv_name, "desc": desc, "running": False})
+
+        if winreg:
+            try:
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Policies\Microsoft\Windows\DataCollection", 0, winreg.KEY_READ) as k:
+                    val, _ = winreg.QueryValueEx(k, "AllowTelemetry")
+                    if val == 0:
+                        telemetry_disabled = True
+            except Exception:
+                pass
+    else:
+        services_info = [{"service": s, "desc": d, "running": False} for s, d in TELEMETRY_SERVICES]
+
+    return {
+        "services": services_info,
+        "policy_disabled": telemetry_disabled
+    }
+
+
+def toggle_telemetry(disable: bool) -> tuple[bool, str]:
+    """Desactiva o restaura los servicios de telemetría y la política de recolección de datos."""
+    if sys.platform != "win32":
+        return False, "La optimización de telemetría sólo está disponible en Windows."
+
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+    for srv_name, _ in TELEMETRY_SERVICES:
+        start_type = "disabled" if disable else "auto"
+        action = "stop" if disable else "start"
+        try:
+            subprocess.run(["sc", "config", srv_name, f"start={start_type}"], startupinfo=startupinfo, check=False)
+            subprocess.run(["sc", action, srv_name], startupinfo=startupinfo, check=False)
+        except Exception:
+            pass
+
+    if winreg:
+        try:
+            key_path = r"SOFTWARE\Policies\Microsoft\Windows\DataCollection"
+            with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, key_path, 0, winreg.KEY_WRITE) as k:
+                val = 0 if disable else 1
+                winreg.SetValueEx(k, "AllowTelemetry", 0, winreg.REG_DWORD, val)
+        except PermissionError:
+            return False, "Se requieren permisos de Administrador para modificar las políticas de telemetría."
+        except Exception:
+            pass
+
+    msg = "Telemetría y servicios de rastreo mitigados con éxito." if disable else "Servicios de telemetría restablecidos a valores por defecto."
+    return True, msg
+
+
+DOWNLOAD_EXTENSIONS = {".exe", ".msi", ".iso", ".zip", ".rar", ".7z", ".tar.gz", ".dmg", ".pkg"}
+
+def audit_old_downloads(min_age_days: int = 30) -> list[dict]:
+    """
+    Busca archivos pesados de instalación y archivos comprimidos en la carpeta de Descargas
+    cuya última modificación sea superior a min_age_days días.
+    """
+    user_home = Path.home()
+    downloads_path = os.path.join(str(user_home), "Downloads")
+    if not os.path.exists(downloads_path):
+        downloads_path = os.path.join(str(user_home), "Descargas")
+    if not os.path.exists(downloads_path):
+        return []
+
+    old_items = []
+    min_age_seconds = max(1, min_age_days) * 86400
+    now = time.time()
+
+    try:
+        for entry in os.listdir(downloads_path):
+            file_path = os.path.join(downloads_path, entry)
+            if os.path.isfile(file_path) and not is_safe_link_or_junction(file_path):
+                ext = Path(entry).suffix.lower()
+                if ext in DOWNLOAD_EXTENSIONS or entry.lower().endswith(".tar.gz"):
+                    try:
+                        stat = os.stat(file_path)
+                        age_sec = now - stat.st_mtime
+                        if age_sec >= min_age_seconds:
+                            size = stat.st_size
+                            old_items.append({
+                                "name": entry,
+                                "path": file_path,
+                                "size": size,
+                                "size_formatted": format_size(size),
+                                "days_old": int(age_sec // 86400),
+                                "mtime": stat.st_mtime
+                            })
+                    except (PermissionError, OSError):
+                        continue
+    except Exception as e:
+        logger.debug("Error auditando descargas: %s", e)
+
+    old_items.sort(key=lambda x: x["size"], reverse=True)
+    return old_items

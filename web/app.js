@@ -15,6 +15,8 @@ const AppState = {
   totalScannedBytes: 0,
   totalScannedFiles: 0,
   heavyFiles: [],
+  installedApps: [],
+  currentLeftovers: [],
   isBusy: false,
   logOpen: true
 };
@@ -90,8 +92,11 @@ function applyInitialState(state) {
     lockedBanner.style.display = "none";
   }
 
-  // Cargar lista de inicio
+  // Cargar módulos iniciales
   loadStartupPrograms();
+  loadInstalledApps();
+  loadTelemetryStatus();
+  loadSchedulerStatus();
 }
 
 // --- Animaciones GSAP de Entrada y Transiciones ---
@@ -1008,12 +1013,333 @@ function setupEventListeners() {
           dupResults.appendChild(item);
         });
       }
-    } catch (err) {
-      btnRunDup.disabled = false;
-      dupStatus.textContent = `Error auditando duplicados: ${err}`;
-      addLog(`Fallo al buscar duplicados: ${err}`, "error");
+  // --- v2.2: Eventos del Desinstalador de Aplicaciones ---
+  const uninstallerSearch = document.getElementById("uninstaller-search");
+  if (uninstallerSearch) {
+    uninstallerSearch.addEventListener("input", (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      const filtered = AppState.installedApps.filter(a => 
+        a.name.toLowerCase().includes(q) || (a.publisher && a.publisher.toLowerCase().includes(q))
+      );
+      renderInstalledApps(filtered);
+    });
+  }
+
+  const btnRefreshApps = document.getElementById("btn-refresh-apps");
+  if (btnRefreshApps) {
+    btnRefreshApps.addEventListener("click", loadInstalledApps);
+  }
+
+  const btnDeleteLeftovers = document.getElementById("btn-delete-leftovers");
+  if (btnDeleteLeftovers) {
+    btnDeleteLeftovers.addEventListener("click", async () => {
+      if (!AppState.currentLeftovers || AppState.currentLeftovers.length === 0) return;
+      if (!confirm(`¿Deseas eliminar definitivamente las ${AppState.currentLeftovers.length} carpetas residuales huérfanas?`)) return;
+
+      addLog(`Eliminando ${AppState.currentLeftovers.length} carpetas de residuos...`, "warning");
+      try {
+        const res = await window.pywebview.api.delete_leftovers(AppState.currentLeftovers);
+        addLog(`Residuos eliminados: ${res.deleted.length} carpetas limpiadas.`, "success");
+        document.getElementById("leftovers-card").style.display = "none";
+        AppState.currentLeftovers = [];
+      } catch (e) {
+        addLog(`Error al eliminar residuos: ${e}`, "error");
+      }
+    });
+  }
+
+  // --- v2.2: Eventos de Privacidad y Telemetría ---
+  const btnRefreshPrivacy = document.getElementById("btn-refresh-privacy");
+  if (btnRefreshPrivacy) {
+    btnRefreshPrivacy.addEventListener("click", loadTelemetryStatus);
+  }
+
+  const btnDisableTel = document.getElementById("btn-disable-telemetry");
+  if (btnDisableTel) {
+    btnDisableTel.addEventListener("click", async () => {
+      addLog("Mitigando telemetría y diagnósticos de Windows...", "info");
+      try {
+        const res = await window.pywebview.api.toggle_telemetry(true);
+        if (res.success) {
+          addLog(res.message, "success");
+        } else {
+          addLog(`Aviso: ${res.message}`, "warning");
+        }
+        loadTelemetryStatus();
+      } catch (e) {
+        addLog(`Error modificando telemetría: ${e}`, "error");
+      }
+    });
+  }
+
+  const btnRestoreTel = document.getElementById("btn-restore-telemetry");
+  if (btnRestoreTel) {
+    btnRestoreTel.addEventListener("click", async () => {
+      addLog("Restableciendo servicios de telemetría...", "info");
+      try {
+        const res = await window.pywebview.api.toggle_telemetry(false);
+        if (res.success) {
+          addLog(res.message, "success");
+        } else {
+          addLog(`Aviso: ${res.message}`, "warning");
+        }
+        loadTelemetryStatus();
+      } catch (e) {
+        addLog(`Error restableciendo telemetría: ${e}`, "error");
+      }
+    });
+  }
+
+  // --- v2.2: Eventos del Programador de Tareas ---
+  const btnSaveScheduler = document.getElementById("btn-save-scheduler");
+  if (btnSaveScheduler) {
+    btnSaveScheduler.addEventListener("click", async () => {
+      const isEnabled = document.getElementById("toggle-scheduler").checked;
+      const freq = document.getElementById("scheduler-frequency").value;
+      addLog(`Configurando tarea de mantenimiento automático (${isEnabled ? 'Activar' : 'Desactivar'})...`, "info");
+      try {
+        const res = await window.pywebview.api.set_scheduled_task(isEnabled, freq);
+        if (res.success) {
+          addLog(res.message, "success");
+        } else {
+          addLog(`Aviso tarea: ${res.message}`, "warning");
+        }
+        loadSchedulerStatus();
+      } catch (e) {
+        addLog(`Error al configurar tarea: ${e}`, "error");
+      }
+    });
+  }
+
+  // --- v2.2: Eventos de Auditoría de Descargas ---
+  const btnAuditDownloads = document.getElementById("btn-audit-downloads");
+  if (btnAuditDownloads) {
+    btnAuditDownloads.addEventListener("click", async () => {
+      const days = parseInt(document.getElementById("downloads-age-select").value) || 30;
+      const statusBox = document.getElementById("downloads-status");
+      const resultsBox = document.getElementById("downloads-results");
+
+      statusBox.textContent = `Buscando instaladores y archivos pesados con más de ${days} días...`;
+      resultsBox.style.display = "none";
+      resultsBox.innerHTML = "";
+      addLog(`Auditando carpeta Descargas (> ${days} días)...`, "info");
+
+      try {
+        const res = await window.pywebview.api.audit_old_downloads(days);
+        const downloads = res.downloads || [];
+
+        if (downloads.length === 0) {
+          statusBox.textContent = `✔ No se encontraron archivos de instalación de más de ${days} días.`;
+          addLog("Auditoría de descargas: 0 archivos obsoletos.", "success");
+        } else {
+          const totalSize = downloads.reduce((acc, d) => acc + (d.size || 0), 0);
+          statusBox.textContent = `✔ Se encontraron ${downloads.length} archivos antiguos ocupando ${formatSize(totalSize)}.`;
+          addLog(`Descargas pesadas detectadas: ${downloads.length} archivos (${formatSize(totalSize)}).`, "warning");
+
+          resultsBox.style.display = "flex";
+          downloads.forEach(d => {
+            const item = document.createElement("div");
+            item.className = "dup-item";
+            item.style.display = "flex";
+            item.style.justifyContent = "space-between";
+            item.style.alignItems = "center";
+            item.innerHTML = `
+              <div>
+                <strong>${escapeHtml(d.name)}</strong>
+                <div style="font-size: 11px; color: var(--text-muted); font-family: Consolas, monospace;">
+                  ${d.size_formatted} • Modificado hace ${d.days_old} días
+                </div>
+              </div>
+              <button class="btn-action-sm" style="background: rgba(239, 68, 68, 0.2); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.4);" data-path="${escapeHtml(d.path)}">
+                Eliminar
+              </button>
+            `;
+            const btnDel = item.querySelector("button");
+            btnDel.addEventListener("click", async () => {
+              if (!confirm(`¿Eliminar definitivamente el archivo de descarga:\n\n${d.name}?`)) return;
+              try {
+                const delRes = await window.pywebview.api.delete_download_file(d.path);
+                if (delRes.success) {
+                  item.remove();
+                  addLog(`Eliminado: ${d.name}`, "success");
+                } else {
+                  addLog(`Fallo al eliminar: ${delRes.message}`, "error");
+                }
+              } catch (e) {
+                addLog(`Error al borrar: ${e}`, "error");
+              }
+            });
+            resultsBox.appendChild(item);
+          });
+        }
+      } catch (e) {
+        statusBox.textContent = `Error auditando descargas: ${e}`;
+        addLog(`Fallo en auditoría de descargas: ${e}`, "error");
+      }
+    });
+  }
+}
+
+// --- v2.2: Funciones del Desinstalador de Aplicaciones ---
+
+async function loadInstalledApps() {
+  const tbody = document.getElementById("uninstaller-tbody");
+  if (!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="5" class="table-loading">Cargando aplicaciones instaladas...</td></tr>`;
+
+  try {
+    let apps = [];
+    if (window.pywebview) {
+      apps = await window.pywebview.api.get_installed_apps();
     }
+    AppState.installedApps = apps || [];
+    renderInstalledApps(AppState.installedApps);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5" class="table-loading">Error al cargar aplicaciones: ${err}</td></tr>`;
+  }
+}
+
+function renderInstalledApps(apps) {
+  const tbody = document.getElementById("uninstaller-tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  if (!apps || apps.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No se encontraron aplicaciones instaladas.</td></tr>`;
+    return;
+  }
+
+  apps.forEach(app => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><strong>${escapeHtml(app.name)}</strong></td>
+      <td style="color: var(--text-muted); font-size: 12px;">${escapeHtml(app.publisher || 'Desconocido')}</td>
+      <td style="color: var(--text-dim); font-size: 12px;">${escapeHtml(app.version || '-')}</td>
+      <td style="font-size: 12px; font-weight: 600; color: var(--accent-cyan);">${escapeHtml(app.size_formatted)}</td>
+      <td style="text-align: right;">
+        <button class="btn-action-sm btn-uninstall-app" style="background: rgba(239, 68, 68, 0.15); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.3);">
+          Desinstalar
+        </button>
+      </td>
+    `;
+
+    const btnUninst = tr.querySelector(".btn-uninstall-app");
+    btnUninst.addEventListener("click", async () => {
+      const cmd = app.uninstall_string || app.quiet_uninstall_string;
+      if (!cmd) {
+        addLog(`No hay comando de desinstalación disponible para '${app.name}'.`, "warning");
+        return;
+      }
+
+      if (!confirm(`¿Iniciar la desinstalación de '${app.name}'?`)) return;
+
+      addLog(`Iniciando desinstalador para: ${app.name}`, "info");
+      try {
+        const res = await window.pywebview.api.run_uninstaller(cmd);
+        if (res.success) {
+          addLog(res.message, "success");
+          // Tras iniciar la desinstalación, buscar residuos huérfanos
+          setTimeout(async () => {
+            addLog(`Buscando posibles carpetas residuales de '${app.name}'...`, "info");
+            const leftRes = await window.pywebview.api.find_app_leftovers(app.name);
+            const leftovers = leftRes.leftovers || [];
+            const card = document.getElementById("leftovers-card");
+            const list = document.getElementById("leftovers-list");
+
+            if (leftovers.length > 0) {
+              AppState.currentLeftovers = leftovers;
+              document.getElementById("leftovers-app-title").textContent = `Residuos de '${app.name}' (${leftovers.length} carpetas)`;
+              list.innerHTML = leftovers.map(p => `<div>• ${escapeHtml(p)}</div>`).join("");
+              card.style.display = "block";
+              addLog(`Encontradas ${leftovers.length} carpetas residuales de '${app.name}'.`, "warning");
+            } else {
+              card.style.display = "none";
+              addLog(`No se detectaron carpetas residuales huérfanas de '${app.name}'.`, "success");
+            }
+          }, 3000);
+        } else {
+          addLog(`Fallo al ejecutar desinstalador: ${res.message}`, "error");
+        }
+      } catch (e) {
+        addLog(`Error al desinstalar: ${e}`, "error");
+      }
+    });
+
+    tbody.appendChild(tr);
   });
+}
+
+// --- v2.2: Funciones de Privacidad y Telemetría ---
+
+async function loadTelemetryStatus() {
+  const container = document.getElementById("telemetry-services-list");
+  const policyStatus = document.getElementById("policy-telemetry-status");
+  if (!container) return;
+
+  try {
+    let status = { services: [], policy_disabled: false };
+    if (window.pywebview) {
+      status = await window.pywebview.api.get_telemetry_status();
+    }
+
+    container.innerHTML = "";
+    (status.services || []).forEach(s => {
+      const div = document.createElement("div");
+      div.style.display = "flex";
+      div.style.justifyContent = "space-between";
+      div.style.alignItems = "center";
+      div.style.padding = "8px 12px";
+      div.style.background = "var(--bg-card-hover)";
+      div.style.borderRadius = "var(--radius-sm)";
+      div.innerHTML = `
+        <div>
+          <strong>${escapeHtml(s.service)}</strong>
+          <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(s.desc)}</div>
+        </div>
+        <span class="status-indicator" style="color: ${s.running ? 'var(--warning)' : 'var(--success)'}; font-weight: 600; font-size: 12px;">
+          ${s.running ? '⚠️ Activo' : '✔ Detenido / Inactivo'}
+        </span>
+      `;
+      container.appendChild(div);
+    });
+
+    if (policyStatus) {
+      if (status.policy_disabled) {
+        policyStatus.textContent = "✔ Política DataCollection: Telemetría restringida/deshabilitada en el Registro.";
+        policyStatus.style.color = "var(--success)";
+      } else {
+        policyStatus.textContent = "⚠️ Política DataCollection: Telemetría de Windows en nivel estándar por defecto.";
+        policyStatus.style.color = "var(--text-muted)";
+      }
+    }
+  } catch (err) {
+    container.innerHTML = `<div class="empty-state">Error cargando telemetría: ${err}</div>`;
+  }
+}
+
+// --- v2.2: Funciones del Programador de Tareas ---
+
+async function loadSchedulerStatus() {
+  const statusText = document.getElementById("scheduler-status-text");
+  const toggle = document.getElementById("toggle-scheduler");
+  if (!statusText || !toggle) return;
+
+  try {
+    let status = { exists: false, enabled: false };
+    if (window.pywebview) {
+      status = await window.pywebview.api.get_scheduled_task_status();
+    }
+    toggle.checked = status.enabled;
+    if (status.enabled) {
+      statusText.textContent = "✔ Estado: Tarea de mantenimiento periódico activada";
+      statusText.style.color = "var(--success)";
+    } else {
+      statusText.textContent = "Estado: Desactivado";
+      statusText.style.color = "var(--text-muted)";
+    }
+  } catch (err) {
+    statusText.textContent = `Error al consultar tarea: ${err}`;
+  }
 }
 
 function escapeHtml(str) {

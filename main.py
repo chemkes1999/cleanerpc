@@ -57,6 +57,51 @@ def run_cli(args):
             print()
         return
 
+    # Operación independiente: Listar aplicaciones instaladas
+    if args.apps:
+        print("[+] Listando aplicaciones instaladas en el sistema:")
+        apps = cleaner.get_installed_apps()
+        if not apps:
+            print("    (No se encontraron aplicaciones o la plataforma no es Windows).\n")
+        else:
+            for a in apps:
+                ver_str = f"v{a['version']}" if a['version'] else ""
+                size_str = f"[{a['size_formatted']}]" if a['size_bytes'] > 0 else ""
+                print(f"    • {a['name']:<40} {ver_str:<15} {size_str}")
+            print(f"\nTotal: {len(apps)} aplicaciones encontradas.\n")
+        return
+
+    # Operación independiente: Auditor de descargas antiguas
+    if args.downloads_audit is not None:
+        days = args.downloads_audit if args.downloads_audit > 0 else 30
+        print(f"[+] Auditando instaladores y archivos pesados en Descargas (> {days} días):")
+        old_downloads = cleaner.audit_old_downloads(min_age_days=days)
+        if not old_downloads:
+            print(f"    ✔ No se encontraron instaladores de más de {days} días.\n")
+        else:
+            total_size = sum(d["size"] for d in old_downloads)
+            print(f"    Encontrados {len(old_downloads)} archivos ocupando {cleaner.format_size(total_size)}:")
+            for d in old_downloads:
+                print(f"    • [{d['size_formatted']:>10}] ({d['days_old']} días) {d['name']}")
+            print()
+        return
+
+    # Operación independiente: Programador de mantenimiento
+    if args.schedule:
+        state_bool = args.schedule.lower() in ("on", "true", "enable", "habilitar", "1")
+        ok, msg = cleaner.set_scheduled_task(state_bool, frequency="weekly")
+        status_tag = "✔" if ok else "❌"
+        print(f"[{status_tag}] Tarea Programada: {msg}\n")
+        return
+
+    # Operación independiente: Optimizar telemetría
+    if args.privacy:
+        disable_bool = args.privacy.lower() in ("on", "true", "disable", "mitigar", "1")
+        ok, msg = cleaner.toggle_telemetry(disable_bool)
+        status_tag = "✔" if ok else "❌"
+        print(f"[{status_tag}] Privacidad y Telemetría: {msg}\n")
+        return
+
     # Salida estructurada JSON para automatización
     if args.json:
         result = {
@@ -266,6 +311,10 @@ def main():
     parser.add_argument("--shred", type=str, metavar="FILE", help="Triturar y destruir un archivo de forma segura")
     parser.add_argument("--shred-passes", type=int, default=1, help="Número de pasadas de sobreescritura al triturar (default: 1)")
     parser.add_argument("--duplicates", type=str, metavar="DIR", help="Buscar archivos duplicados en el directorio especificado")
+    parser.add_argument("--apps", action="store_true", help="Listar programas y aplicaciones instaladas en Windows")
+    parser.add_argument("--downloads-audit", type=int, nargs="?", const=30, metavar="DAYS", help="Auditar instaladores pesados en Descargas con más de X días (default: 30)")
+    parser.add_argument("--schedule", type=str, choices=["on", "off"], metavar="STATE", help="Activar o desactivar tarea semanal de mantenimiento automático (on/off)")
+    parser.add_argument("--privacy", type=str, choices=["on", "off"], metavar="STATE", help="Mitigar o restaurar telemetría y diagnósticos de Windows (on/off)")
     parser.add_argument("--export", type=str, metavar="PATH", help="Ruta donde exportar el informe de resultados (.json o .txt)")
     parser.add_argument("--json", action="store_true", help="Emitir resultados en formato JSON estructurado")
     parser.add_argument("--all", action="store_true", help="Ejecutar escaneo, limpieza, optimización de RAM y DNS")
@@ -288,6 +337,10 @@ def main():
         or args.json
         or args.shred
         or args.duplicates
+        or args.apps
+        or (args.downloads_audit is not None)
+        or args.schedule
+        or args.privacy
     ):
         run_cli(args)
     else:
