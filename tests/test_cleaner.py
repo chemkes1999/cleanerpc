@@ -32,7 +32,7 @@ def test_is_path_excluded():
     assert cleaner.is_path_excluded("/tmp/safe_dir_not_really", exclusions) is False
 
 
-def test_is_file_safe_to_clean():
+def test_is_file_safe_to_clean(monkeypatch):
     with tempfile.NamedTemporaryFile(delete=False) as f:
         f.write(b"test data")
         temp_path = f.name
@@ -45,9 +45,15 @@ def test_is_file_safe_to_clean():
         # Con min_age_hours = 0 -> seguro
         assert cleaner.is_file_safe_to_clean(temp_path, supports_age_filter=True, min_age_hours=0) is True
 
-        # Modificar mtime para simular archivo antiguo (hace 48 horas)
+        # Simular archivo antiguo (hace 48 horas) incluyendo st_ctime en Windows
         two_days_ago = time.time() - (48 * 3600)
         os.utime(temp_path, (two_days_ago, two_days_ago))
+
+        class _OldStat:
+            st_mtime = two_days_ago
+            st_ctime = two_days_ago
+
+        monkeypatch.setattr(cleaner.os, "stat", lambda p, *a, **kw: _OldStat())
         assert cleaner.is_file_safe_to_clean(temp_path, supports_age_filter=True, min_age_hours=24) is True
     finally:
         if os.path.exists(temp_path):
