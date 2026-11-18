@@ -365,6 +365,14 @@ async function loadVaultView() {
   }
 }
 
+function setVaultAuthStatus(message, type = "") {
+  const authStatus = document.getElementById("vault-auth-status");
+  if (!authStatus) return;
+  authStatus.textContent = message;
+  authStatus.classList.remove("error", "success");
+  if (type) authStatus.classList.add(type);
+}
+
 function applyVaultStatus(st) {
   V24State.vaultExists = Boolean(st && st.exists);
   const lockScreen = document.getElementById("vault-lock-screen");
@@ -372,9 +380,9 @@ function applyVaultStatus(st) {
   const unlockedTools = document.getElementById("vault-unlocked-tools");
   const lockTitle = document.getElementById("vault-lock-title");
   const lockDesc = document.getElementById("vault-lock-desc");
-  const confirmInput = document.getElementById("vault-master-confirm");
+  const confirmField = document.getElementById("vault-confirm-field");
+  const masterMeter = document.getElementById("vault-master-meter");
   const submitBtn = document.getElementById("btn-vault-submit");
-  const authStatus = document.getElementById("vault-auth-status");
 
   if (!lockScreen || !mainPanel) return;
 
@@ -391,15 +399,17 @@ function applyVaultStatus(st) {
     if (V24State.vaultExists) {
       if (lockTitle) lockTitle.textContent = "Desbloquear Bóveda";
       if (lockDesc) lockDesc.textContent = "Introduce tu contraseña maestra para descifrar tus credenciales en memoria.";
-      if (confirmInput) confirmInput.style.display = "none";
-      if (submitBtn) submitBtn.textContent = "Desbloquear";
-      if (authStatus) authStatus.textContent = "Bóveda cifrada lista para desbloquear.";
+      if (confirmField) confirmField.style.display = "none";
+      if (masterMeter) masterMeter.style.display = "none";
+      if (submitBtn) submitBtn.textContent = "Desbloquear Bóveda";
+      setVaultAuthStatus("Bóveda cifrada lista para desbloquear.");
     } else {
       if (lockTitle) lockTitle.textContent = "Crear Nueva Bóveda Cifrada";
-      if (lockDesc) lockDesc.textContent = "Elige una contraseña maestra fuerte (mín. 8 caracteres). No se puede recuperar si la olvidas.";
-      if (confirmInput) confirmInput.style.display = "block";
-      if (submitBtn) submitBtn.textContent = "Crear Bóveda";
-      if (authStatus) authStatus.textContent = "Aún no existe una bóveda en este equipo.";
+      if (lockDesc) lockDesc.textContent = "Elige una contraseña maestra fuerte (mín. 8 caracteres). Nunca se guarda en disco y no se puede recuperar si la olvidas.";
+      if (confirmField) confirmField.style.display = "flex";
+      if (masterMeter) masterMeter.style.display = "flex";
+      if (submitBtn) submitBtn.textContent = "Crear Bóveda Cifrada";
+      setVaultAuthStatus("Aún no existe una bóveda en este equipo.");
     }
   }
 }
@@ -415,10 +425,61 @@ async function refreshVaultEntries() {
       return;
     }
     V24State.vaultEntries = res.entries || [];
-    renderVaultEntries(V24State.vaultEntries);
+    updateVaultKpisAndFilters(V24State.vaultEntries);
+    applyVaultSearchAndFilter();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="4" class="table-loading" style="color:var(--danger);">Error: ${v24Escape(err)}</td></tr>`;
   }
+}
+
+function updateVaultKpisAndFilters(entries) {
+  const totalEl = document.getElementById("vault-kpi-total");
+  const catsEl = document.getElementById("vault-kpi-categories");
+  const pillsWrap = document.getElementById("vault-filter-pills");
+
+  const categories = [...new Set((entries || []).map(e => e.category || "General"))].sort();
+  if (totalEl) totalEl.textContent = String((entries || []).length);
+  if (catsEl) catsEl.textContent = String(categories.length);
+
+  if (!pillsWrap) return;
+  if (!V24State.vaultActiveCategory) V24State.vaultActiveCategory = "Todas";
+  if (V24State.vaultActiveCategory !== "Todas" && !categories.includes(V24State.vaultActiveCategory)) {
+    V24State.vaultActiveCategory = "Todas";
+  }
+
+  const allCats = ["Todas", ...categories];
+  pillsWrap.innerHTML = "";
+  allCats.forEach(cat => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `vault-filter-pill${V24State.vaultActiveCategory === cat ? " active" : ""}`;
+    btn.textContent = cat;
+    btn.addEventListener("click", () => {
+      V24State.vaultActiveCategory = cat;
+      updateVaultKpisAndFilters(V24State.vaultEntries);
+      applyVaultSearchAndFilter();
+    });
+    pillsWrap.appendChild(btn);
+  });
+}
+
+function applyVaultSearchAndFilter() {
+  const searchEl = document.getElementById("vault-search");
+  const q = searchEl ? searchEl.value.trim().toLowerCase() : "";
+  const activeCat = V24State.vaultActiveCategory || "Todas";
+
+  const filtered = (V24State.vaultEntries || []).filter(en => {
+    const matchesCat = activeCat === "Todas" || (en.category || "General") === activeCat;
+    const matchesQuery =
+      !q ||
+      (en.title && en.title.toLowerCase().includes(q)) ||
+      (en.username && en.username.toLowerCase().includes(q)) ||
+      (en.category && en.category.toLowerCase().includes(q)) ||
+      (en.url && en.url.toLowerCase().includes(q));
+    return matchesCat && matchesQuery;
+  });
+
+  renderVaultEntries(filtered);
 }
 
 function renderVaultEntries(entries) {
@@ -427,29 +488,39 @@ function renderVaultEntries(entries) {
   tbody.innerHTML = "";
 
   if (!entries || entries.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" class="table-loading">No hay credenciales guardadas. Agrega la primera arriba.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="table-loading">No hay credenciales que coincidan. Agrega una nueva arriba.</td></tr>`;
     return;
   }
 
   entries.forEach(entry => {
+    const initials = (entry.title || "??").trim().slice(0, 2).toUpperCase();
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td style="font-weight: 600;">
-        ${v24Escape(entry.title)}
-        ${entry.url ? `<div style="font-size:11px; color:var(--text-dim); font-weight:400;">${v24Escape(entry.url)}</div>` : ""}
+      <td>
+        <div class="vault-service-cell">
+          <div class="vault-avatar">${v24Escape(initials)}</div>
+          <div>
+            <div class="vault-service-title">${v24Escape(entry.title)}</div>
+            ${entry.url ? `<div class="vault-service-url">${v24Escape(entry.url)}</div>` : ""}
+          </div>
+        </div>
       </td>
-      <td style="font-family: Consolas, monospace; font-size: 12px;">${v24Escape(entry.username || "—")}</td>
+      <td><span class="vault-user-chip">${v24Escape(entry.username || "—")}</span></td>
       <td><span class="badge badge-primary">${v24Escape(entry.category || "General")}</span></td>
       <td style="text-align: right; white-space: nowrap;">
-        <button class="btn-tool btn-vault-copy" style="padding:3px 8px; font-size:11px; margin-right:4px;">📋 Copiar Clave</button>
-        <button class="btn-tool btn-vault-edit" style="padding:3px 8px; font-size:11px; margin-right:4px;">✏️ Editar</button>
-        <button class="btn-tool btn-vault-del" style="padding:3px 8px; font-size:11px; color: var(--danger); border-color: rgba(239,68,68,0.35);">🗑️</button>
+        <button class="btn-tool btn-vault-copy" style="padding:5px 10px; font-size:11.5px; margin-right:5px;">📋 Copiar Clave</button>
+        <button class="btn-tool btn-vault-edit" style="padding:5px 10px; font-size:11.5px; margin-right:5px;">✏️ Editar</button>
+        <button class="btn-tool btn-vault-del vault-btn-del" style="padding:5px 9px; font-size:11.5px;">🗑️</button>
       </td>
     `;
 
-    tr.querySelector(".btn-vault-copy").addEventListener("click", async () => {
+    const copyBtn = tr.querySelector(".btn-vault-copy");
+    copyBtn.addEventListener("click", async () => {
       try {
         await window.pywebview.api.vault_copy_secret(entry.password, 30);
+        const origText = copyBtn.textContent;
+        copyBtn.textContent = "✓ Copiado (30s)";
+        setTimeout(() => { copyBtn.textContent = origText; }, 2200);
         v24Log(`Contraseña de '${entry.title}' copiada (se limpiará en 30s).`, "success");
       } catch (e) {
         v24Log(`Error copiando contraseña: ${e}`, "error");
@@ -483,14 +554,14 @@ function renderVaultEntries(entries) {
   });
 }
 
-async function updatePasswordStrengthUI(pwd) {
-  const fill = document.getElementById("vault-strength-fill");
-  const label = document.getElementById("vault-strength-label");
+async function updatePasswordStrengthUI(pwd, fillId = "vault-strength-fill", labelId = "vault-strength-label") {
+  const fill = document.getElementById(fillId);
+  const label = document.getElementById(labelId);
   if (!fill || !label) return;
 
   if (!pwd) {
     fill.style.width = "0%";
-    label.textContent = "Fortaleza: —";
+    label.textContent = fillId.includes("master") ? "Seguridad: —" : "Fortaleza: —";
     label.style.color = "var(--text-muted)";
     return;
   }
@@ -500,7 +571,7 @@ async function updatePasswordStrengthUI(pwd) {
     const pct = Math.min(100, (info.score || 0) * 25);
     fill.style.width = `${pct}%`;
     fill.style.background = info.color || "var(--primary)";
-    label.textContent = `Fortaleza: ${info.label} (${info.entropy_bits} bits)`;
+    label.textContent = `${info.label} (${info.entropy_bits} bits)`;
     label.style.color = info.color || "var(--text-muted)";
   } catch (e) {
     // fallback silencioso
@@ -601,33 +672,70 @@ function initV24Modules() {
   }
 
   // --- Bóveda ---
+  const bindEyeToggle = (btnId, inputId) => {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      const inp = document.getElementById(inputId);
+      if (inp) inp.type = inp.type === "password" ? "text" : "password";
+    });
+  };
+  bindEyeToggle("btn-vault-toggle-master", "vault-master-input");
+  bindEyeToggle("btn-vault-toggle-confirm", "vault-master-confirm");
+  bindEyeToggle("btn-vault-toggle-pwd", "vault-password");
+
+  const masterInput = document.getElementById("vault-master-input");
+  const confirmInput = document.getElementById("vault-master-confirm");
   const btnVaultSubmit = document.getElementById("btn-vault-submit");
+
+  if (masterInput) {
+    masterInput.addEventListener("input", e => {
+      if (!V24State.vaultExists) {
+        updatePasswordStrengthUI(e.target.value, "vault-master-strength-fill", "vault-master-strength-label");
+      }
+    });
+    masterInput.addEventListener("keydown", e => {
+      if (e.key === "Enter" && btnVaultSubmit) btnVaultSubmit.click();
+    });
+  }
+  if (confirmInput) {
+    confirmInput.addEventListener("keydown", e => {
+      if (e.key === "Enter" && btnVaultSubmit) btnVaultSubmit.click();
+    });
+  }
+
   if (btnVaultSubmit) {
     btnVaultSubmit.addEventListener("click", async () => {
-      const pwdInput = document.getElementById("vault-master-input");
-      const confirmInput = document.getElementById("vault-master-confirm");
-      const statusBox = document.getElementById("vault-auth-status");
-      const pwd = pwdInput ? pwdInput.value : "";
+      const pwd = masterInput ? masterInput.value : "";
 
       if (!V24State.vaultExists) {
         const confirmPwd = confirmInput ? confirmInput.value : "";
+        if (!pwd || pwd.length < 8) {
+          setVaultAuthStatus("La contraseña maestra debe tener al menos 8 caracteres.", "error");
+          return;
+        }
         if (pwd !== confirmPwd) {
-          if (statusBox) statusBox.textContent = "Las contraseñas maestras no coinciden.";
+          setVaultAuthStatus("Las contraseñas maestras no coinciden.", "error");
           return;
         }
         const res = await window.pywebview.api.vault_create(pwd);
-        if (statusBox) statusBox.textContent = res.message;
+        setVaultAuthStatus(res.message, res.success ? "success" : "error");
         if (res.success) {
-          pwdInput.value = "";
+          masterInput.value = "";
           confirmInput.value = "";
+          updatePasswordStrengthUI("", "vault-master-strength-fill", "vault-master-strength-label");
           v24Log(res.message, "success");
           applyVaultStatus(res.status);
         }
       } else {
+        if (!pwd) {
+          setVaultAuthStatus("Introduce tu contraseña maestra.", "error");
+          return;
+        }
         const res = await window.pywebview.api.vault_unlock(pwd);
-        if (statusBox) statusBox.textContent = res.message;
+        setVaultAuthStatus(res.message, res.success ? "success" : "error");
         if (res.success) {
-          pwdInput.value = "";
+          masterInput.value = "";
           v24Log(res.message, "success");
           applyVaultStatus(res.status);
         }
@@ -659,14 +767,6 @@ function initV24Modules() {
       const res = await window.pywebview.api.vault_import_backup();
       v24Log(res.message, res.success ? "success" : "warning");
       if (res.status) applyVaultStatus(res.status);
-    });
-  }
-
-  const btnTogglePwd = document.getElementById("btn-vault-toggle-pwd");
-  if (btnTogglePwd) {
-    btnTogglePwd.addEventListener("click", () => {
-      const inp = document.getElementById("vault-password");
-      if (inp) inp.type = inp.type === "password" ? "text" : "password";
     });
   }
 
@@ -724,14 +824,14 @@ function initV24Modules() {
   if (genRange) {
     genRange.addEventListener("input", e => {
       const val = document.getElementById("vault-gen-length-val");
-      if (val) val.textContent = e.target.value;
+      if (val) val.textContent = `${e.target.value} caracteres`;
     });
   }
 
   const btnGenerate = document.getElementById("btn-vault-generate");
   if (btnGenerate) {
     btnGenerate.addEventListener("click", async () => {
-      const len = parseInt(document.getElementById("vault-gen-length").value) || 18;
+      const len = parseInt(document.getElementById("vault-gen-length").value) || 20;
       const upper = document.getElementById("vault-gen-upper").checked;
       const digits = document.getElementById("vault-gen-digits").checked;
       const symbols = document.getElementById("vault-gen-symbols").checked;
@@ -748,22 +848,16 @@ function initV24Modules() {
       const pwd = preview ? preview.textContent : "";
       if (!pwd || pwd.startsWith("Pulsa")) return;
       await window.pywebview.api.vault_copy_secret(pwd, 30);
+      const orig = btnCopyGen.textContent;
+      btnCopyGen.textContent = "✓ Copiado";
+      setTimeout(() => { btnCopyGen.textContent = orig; }, 2000);
       v24Log("Contraseña generada copiada (se limpiará del portapapeles en 30s).", "success");
     });
   }
 
   const vaultSearch = document.getElementById("vault-search");
   if (vaultSearch) {
-    vaultSearch.addEventListener("input", e => {
-      const q = e.target.value.toLowerCase();
-      const filtered = V24State.vaultEntries.filter(
-        en =>
-          (en.title && en.title.toLowerCase().includes(q)) ||
-          (en.username && en.username.toLowerCase().includes(q)) ||
-          (en.category && en.category.toLowerCase().includes(q))
-      );
-      renderVaultEntries(filtered);
-    });
+    vaultSearch.addEventListener("input", () => applyVaultSearchAndFilter());
   }
 }
 

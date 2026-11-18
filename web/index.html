@@ -862,100 +862,236 @@
           </div>
         </section>
 
-        <!-- Vista v2.4: Bóveda Local de Contraseñas (AES-256-GCM) -->
+        <!-- Vista v2.5: Bóveda Local de Contraseñas (AES-256-GCM) -->
         <section class="tab-view" id="tab-vault">
           <div class="view-header">
             <div>
-              <h2>Bóveda Local Cifrada (AES-256-GCM)</h2>
-              <p>Almacenamiento 100% offline con PBKDF2-SHA256 (600,000 iteraciones). Tu contraseña maestra nunca se guarda en disco.</p>
+              <h2>Bóveda Local Cifrada</h2>
+              <p>Gestor 100% offline con cifrado autenticado AES-256-GCM y PBKDF2-SHA256 (600,000 iteraciones).</p>
             </div>
             <div class="view-tools" id="vault-unlocked-tools" style="display: none;">
               <button class="btn-tool" id="btn-vault-export">💾 Exportar Respaldo</button>
-              <button class="btn-tool" id="btn-vault-lock" style="border-color: var(--warning); color: var(--warning);">🔒 Bloquear</button>
+              <button class="btn-tool vault-btn-lock" id="btn-vault-lock">🔒 Bloquear Bóveda</button>
             </div>
           </div>
 
           <!-- Pantalla de Bloqueo / Creación -->
-          <div class="card vault-lock-card" id="vault-lock-screen">
-            <div class="vault-lock-icon">🔐</div>
-            <h3 id="vault-lock-title">Desbloquear Bóveda</h3>
-            <p class="setting-desc" id="vault-lock-desc">Introduce tu contraseña maestra para descifrar tus credenciales en memoria.</p>
+          <div class="vault-auth-stage" id="vault-lock-screen">
+            <div class="vault-lock-card">
+              <div class="vault-lock-glow"></div>
 
-            <div class="vault-auth-form">
-              <input type="password" id="vault-master-input" class="modern-input" placeholder="Contraseña maestra (mín. 8 caracteres)..." autocomplete="off">
-              <input type="password" id="vault-master-confirm" class="modern-input" placeholder="Confirmar contraseña maestra..." style="display: none;" autocomplete="off">
-              <div style="display: flex; gap: 10px; justify-content: center; margin-top: 8px;">
-                <button class="btn-primary" id="btn-vault-submit">Desbloquear</button>
-                <button class="btn-tool" id="btn-vault-import">📂 Importar Respaldo</button>
+              <div class="vault-emblem">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  <rect x="9" y="11" width="6" height="5" rx="1.2"/>
+                  <path d="M10 11V9a2 2 0 1 1 4 0v2"/>
+                </svg>
               </div>
-              <div class="tool-status-box" id="vault-auth-status" style="margin-top: 10px; text-align: center;">Bóveda bloqueada.</div>
+
+              <h3 id="vault-lock-title">Crear Nueva Bóveda Cifrada</h3>
+              <p class="vault-lock-subtitle" id="vault-lock-desc">
+                Elige una contraseña maestra fuerte (mín. 8 caracteres). Nunca se guarda en disco y no se puede recuperar si la olvidas.
+              </p>
+
+              <div class="vault-security-pills">
+                <span class="vault-sec-pill">AES-256-GCM</span>
+                <span class="vault-sec-pill">PBKDF2 600k</span>
+                <span class="vault-sec-pill">100% Offline</span>
+              </div>
+
+              <div class="vault-auth-form">
+                <div class="vault-field">
+                  <label for="vault-master-input">Contraseña maestra</label>
+                  <div class="vault-input-wrap">
+                    <input type="password" id="vault-master-input" class="vault-input" placeholder="Introduce tu contraseña maestra..." autocomplete="off">
+                    <button type="button" class="vault-eye-btn" id="btn-vault-toggle-master" title="Mostrar u ocultar contraseña">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="vault-master-meter" id="vault-master-meter" style="display: none;">
+                  <div class="vault-strength-bar"><div id="vault-master-strength-fill"></div></div>
+                  <span id="vault-master-strength-label">Seguridad: —</span>
+                </div>
+
+                <div class="vault-field" id="vault-confirm-field" style="display: none;">
+                  <label for="vault-master-confirm">Confirmar contraseña maestra</label>
+                  <div class="vault-input-wrap">
+                    <input type="password" id="vault-master-confirm" class="vault-input" placeholder="Repite la contraseña maestra..." autocomplete="off">
+                    <button type="button" class="vault-eye-btn" id="btn-vault-toggle-confirm" title="Mostrar u ocultar confirmación">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="vault-auth-actions">
+                  <button class="btn-primary vault-btn-submit" id="btn-vault-submit">Crear Bóveda Cifrada</button>
+                  <button class="btn-tool vault-btn-import" id="btn-vault-import">📂 Importar respaldo (.vault)</button>
+                </div>
+
+                <div class="vault-auth-status" id="vault-auth-status">Aún no existe una bóveda en este equipo.</div>
+              </div>
             </div>
           </div>
 
           <!-- Panel Desbloqueado -->
           <div id="vault-main-panel" style="display: none;">
-            <div class="tools-grid">
-              <!-- Formulario Nueva / Editar Credencial -->
-              <div class="card">
-                <h3 id="vault-form-title">Agregar Credencial</h3>
-                <input type="hidden" id="vault-entry-id">
-                <div class="vault-form-grid">
-                  <input type="text" id="vault-title" class="modern-input" placeholder="Título (ej. GitHub, Correo...)">
-                  <input type="text" id="vault-category" class="modern-input" placeholder="Categoría (ej. Trabajo, Personal)" value="General">
-                  <input type="text" id="vault-username" class="modern-input" placeholder="Usuario o correo electrónico">
-                  <input type="text" id="vault-url" class="modern-input" placeholder="URL (opcional, ej. https://...)">
-                  <div style="display: flex; gap: 8px; grid-column: 1 / -1;">
-                    <input type="password" id="vault-password" class="modern-input" placeholder="Contraseña" style="flex: 1;">
-                    <button class="btn-tool" id="btn-vault-toggle-pwd" title="Mostrar/Ocultar">👁️</button>
-                    <button class="btn-tool" id="btn-vault-gen-fill" title="Generar contraseña segura">🎲 Generar</button>
-                  </div>
-                  <div class="vault-strength-row" style="grid-column: 1 / -1;">
-                    <div class="vault-strength-bar"><div id="vault-strength-fill"></div></div>
-                    <span id="vault-strength-label" style="font-size: 11px; color: var(--text-muted);">Fortaleza: —</span>
-                  </div>
-                  <input type="text" id="vault-notes" class="modern-input" placeholder="Notas opcionales" style="grid-column: 1 / -1;">
+            <!-- Barra de KPIs de Seguridad -->
+            <div class="vault-kpi-strip">
+              <div class="vault-kpi-card">
+                <div class="vault-kpi-icon cyan">🔑</div>
+                <div>
+                  <div class="vault-kpi-value" id="vault-kpi-total">0</div>
+                  <div class="vault-kpi-label">Credenciales guardadas</div>
                 </div>
-                <div style="display: flex; gap: 10px; margin-top: 12px;">
+              </div>
+              <div class="vault-kpi-card">
+                <div class="vault-kpi-icon indigo">🏷️</div>
+                <div>
+                  <div class="vault-kpi-value" id="vault-kpi-categories">0</div>
+                  <div class="vault-kpi-label">Categorías activas</div>
+                </div>
+              </div>
+              <div class="vault-kpi-card">
+                <div class="vault-kpi-icon emerald">🛡️</div>
+                <div>
+                  <div class="vault-kpi-value">AES-256-GCM</div>
+                  <div class="vault-kpi-label">Cifrado activo • Portapapeles 30s</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="vault-workspace-grid">
+              <!-- Formulario Nueva / Editar Credencial -->
+              <div class="card vault-panel-card">
+                <div class="vault-card-head">
+                  <div>
+                    <h3 id="vault-form-title">Agregar Credencial</h3>
+                    <p class="setting-desc">Los datos se cifran en memoria y se guardan con un nonce único en cada cambio.</p>
+                  </div>
+                </div>
+
+                <input type="hidden" id="vault-entry-id">
+
+                <div class="vault-form-grid">
+                  <div class="vault-field">
+                    <label for="vault-title">Título / Servicio *</label>
+                    <input type="text" id="vault-title" class="vault-input" placeholder="Ej. GitHub, Gmail, Banco...">
+                  </div>
+
+                  <div class="vault-field">
+                    <label for="vault-category">Categoría</label>
+                    <select id="vault-category" class="vault-input">
+                      <option value="General">General</option>
+                      <option value="Personal">Personal</option>
+                      <option value="Trabajo">Trabajo</option>
+                      <option value="Desarrollo">Desarrollo</option>
+                      <option value="Finanzas">Finanzas</option>
+                      <option value="Redes Sociales">Redes Sociales</option>
+                    </select>
+                  </div>
+
+                  <div class="vault-field">
+                    <label for="vault-username">Usuario o correo</label>
+                    <input type="text" id="vault-username" class="vault-input" placeholder="usuario@dominio.com">
+                  </div>
+
+                  <div class="vault-field">
+                    <label for="vault-url">Sitio web (opcional)</label>
+                    <input type="text" id="vault-url" class="vault-input" placeholder="https://...">
+                  </div>
+
+                  <div class="vault-field vault-col-full">
+                    <label for="vault-password">Contraseña *</label>
+                    <div class="vault-pwd-row">
+                      <div class="vault-input-wrap" style="flex: 1;">
+                        <input type="password" id="vault-password" class="vault-input" placeholder="Escribe o genera una contraseña segura...">
+                        <button type="button" class="vault-eye-btn" id="btn-vault-toggle-pwd" title="Mostrar u ocultar">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                          </svg>
+                        </button>
+                      </div>
+                      <button type="button" class="btn-tool vault-gen-inline-btn" id="btn-vault-gen-fill" title="Generar contraseña segura">🎲 Generar</button>
+                    </div>
+                  </div>
+
+                  <div class="vault-strength-row vault-col-full">
+                    <div class="vault-strength-bar"><div id="vault-strength-fill"></div></div>
+                    <span id="vault-strength-label">Fortaleza: —</span>
+                  </div>
+
+                  <div class="vault-field vault-col-full">
+                    <label for="vault-notes">Notas privadas (opcional)</label>
+                    <input type="text" id="vault-notes" class="vault-input" placeholder="Ej. 2FA activado, códigos de recuperación...">
+                  </div>
+                </div>
+
+                <div class="vault-form-actions">
                   <button class="btn-primary" id="btn-vault-save-entry">Guardar en Bóveda</button>
                   <button class="btn-tool" id="btn-vault-clear-form">Limpiar</button>
                 </div>
               </div>
 
               <!-- Generador de Contraseñas -->
-              <div class="card">
-                <h3>Generador Criptográfico</h3>
-                <p class="setting-desc">Crea claves de alta entropía usando el módulo <code>secrets</code>.</p>
+              <div class="card vault-panel-card vault-gen-card">
+                <div class="vault-card-head">
+                  <div>
+                    <h3>Generador Criptográfico</h3>
+                    <p class="setting-desc">Claves de alta entropía generadas con <code>secrets</code> (CSPRNG).</p>
+                  </div>
+                </div>
+
                 <div class="vault-gen-output">
                   <code id="vault-gen-preview">Pulsa Generar...</code>
-                  <button class="btn-tool" id="btn-vault-copy-gen" style="padding: 4px 10px; font-size: 11px;">📋 Copiar</button>
+                  <button class="btn-tool vault-copy-mini" id="btn-vault-copy-gen">📋 Copiar</button>
                 </div>
-                <div class="tool-input-row" style="margin-top: 10px;">
-                  <label for="vault-gen-length" style="font-size: 12px; color: var(--text-muted);">Longitud: <strong id="vault-gen-length-val">18</strong></label>
-                  <input type="range" id="vault-gen-length" min="10" max="48" value="18" style="flex: 1;">
+
+                <div class="vault-slider-box">
+                  <div class="vault-slider-head">
+                    <span>Longitud de la clave</span>
+                    <strong id="vault-gen-length-val">20 caracteres</strong>
+                  </div>
+                  <input type="range" id="vault-gen-length" class="vault-range" min="10" max="48" value="20">
                 </div>
+
                 <div class="vault-gen-checks">
-                  <label><input type="checkbox" id="vault-gen-upper" checked> Mayúsculas</label>
-                  <label><input type="checkbox" id="vault-gen-digits" checked> Números</label>
-                  <label><input type="checkbox" id="vault-gen-symbols" checked> Símbolos</label>
+                  <label class="vault-check-pill"><input type="checkbox" id="vault-gen-upper" checked> <span>A-Z Mayúsculas</span></label>
+                  <label class="vault-check-pill"><input type="checkbox" id="vault-gen-digits" checked> <span>0-9 Números</span></label>
+                  <label class="vault-check-pill"><input type="checkbox" id="vault-gen-symbols" checked> <span>!@# Símbolos</span></label>
                 </div>
-                <button class="btn-primary" id="btn-vault-generate" style="margin-top: 12px; width: 100%;">🎲 Generar Nueva Clave</button>
+
+                <button class="btn-primary vault-gen-submit" id="btn-vault-generate">🎲 Generar Nueva Clave</button>
               </div>
             </div>
 
             <!-- Lista de Credenciales Guardadas -->
-            <div class="card" style="margin-top: 18px;">
-              <div class="treemap-header">
+            <div class="card vault-list-card">
+              <div class="vault-list-header">
                 <div>
                   <h3>Credenciales Guardadas</h3>
-                  <p class="setting-desc">Al copiar una contraseña, el portapapeles se limpia automáticamente en 30 segundos.</p>
+                  <p class="setting-desc">Al copiar una contraseña, el portapapeles se borra automáticamente a los 30 segundos.</p>
                 </div>
-                <input type="text" id="vault-search" class="modern-input" placeholder="🔍 Buscar en la bóveda..." style="width: 220px;">
+                <div class="vault-search-wrap">
+                  <input type="text" id="vault-search" class="vault-input vault-search-input" placeholder="🔍 Buscar por servicio, usuario o categoría...">
+                </div>
               </div>
-              <div class="table-container" style="max-height: 280px;">
-                <table class="modern-table">
+
+              <div class="vault-filter-pills" id="vault-filter-pills"></div>
+
+              <div class="table-container" style="max-height: 320px;">
+                <table class="modern-table vault-table">
                   <thead>
                     <tr>
-                      <th>Título</th>
+                      <th>Servicio</th>
                       <th>Usuario</th>
                       <th>Categoría</th>
                       <th style="text-align: right;">Acciones</th>
@@ -1020,7 +1156,7 @@
             </div>
           </div>
           <div class="log-terminal" id="log-terminal">
-            <div class="log-line dim">[Sistema] PyClean Pro v2.4 inicializado con motor GSAP.</div>
+            <div class="log-line dim">[Sistema] PyClean Pro v2.5 inicializado con motor GSAP.</div>
           </div>
         </div>
       </footer>
