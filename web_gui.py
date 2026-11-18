@@ -295,6 +295,40 @@ class PyCleanAPI:
             return {"success": False, "message": str(e)}
         return {"success": False, "message": "Archivo no encontrado."}
 
+    # --- v2.3: Analizador de Almacenamiento, Particiones y Treemap ---
+    def get_partitions_detailed(self):
+        """Retorna información detallada de todas las particiones del sistema."""
+        return cleaner.get_partitions_detailed()
+
+    def scan_folder_treemap(self, target_path: str):
+        """Escanea una carpeta o unidad para generar la jerarquía Treemap."""
+        return cleaner.scan_folder_treemap(target_path)
+
+    def find_largest_files(self, target_path: str, min_size_mb: int = 100, limit: int = 50):
+        """Busca los archivos más pesados en la unidad o carpeta."""
+        return cleaner.find_largest_files(target_path, min_size_mb=min_size_mb, limit=limit)
+
+    def open_in_explorer(self, target_path: str):
+        """Abre la carpeta o selecciona el archivo en el Explorador de Windows."""
+        ok = cleaner.open_in_explorer(target_path)
+        return {"success": ok}
+
+    def delete_or_shred_file(self, file_path: str, shred: bool = False):
+        """Elimina o tritura de forma segura un archivo pesado."""
+        try:
+            if not os.path.exists(file_path) or not os.path.isfile(file_path):
+                return {"success": False, "message": "El archivo especificado no existe."}
+
+            if shred:
+                ok, msg = cleaner.shred_file(file_path, passes=3)
+                return {"success": ok, "message": msg}
+            else:
+                os.remove(file_path)
+                return {"success": True, "message": "Archivo eliminado correctamente."}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
+
 
 def run_web_gui():
     """Lanza la interfaz moderna PyWebView + GSAP."""

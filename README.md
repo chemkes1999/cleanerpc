@@ -1,12 +1,35 @@
-# ⚡ PyClean Pro v2.2 - Suite Integral de Optimización, Mantenimiento y Privacidad para Windows
+# ⚡ PyClean Pro v2.3 - Suite Integral de Optimización, Mantenimiento y Privacidad para Windows
 
-Una aplicación profesional, moderna, rápida y segura desarrollada en Python para analizar y limpiar archivos residuales, auditar y desinstalar aplicaciones sin dejar restos huérfanos, programar mantenimientos automáticos con Windows Task Scheduler, mitigar la telemetría del sistema, triturar archivos confidenciales de forma irrecuperable y optimizar el rendimiento del sistema operativo.
+Una aplicación profesional, moderna, rápida y segura desarrollada en Python para analizar y limpiar archivos residuales, auditar y desinstalar aplicaciones sin dejar restos huérfanos, explorar visualmente particiones y carpetas con Treemap interactivo, cazar archivos gigantes, programar mantenimientos automáticos con Windows Task Scheduler, mitigar la telemetría del sistema, triturar archivos confidenciales de forma irrecuperable y optimizar el rendimiento del sistema operativo.
 
 ---
 
 ## 🚀 Novedades y Características Principales
 
-### 1. Limpieza Inteligente y Segura (20 Categorías)
+### 1. 🗺️ Mapa de Almacenamiento, Particiones y Treemap (Nuevo en v2.3)
+- **Vista de Particiones y Unidades de Disco:**
+  - Detecta todas las unidades (`C:\`, `D:\`, discos externos, USBs) mostrando nombre de volumen, sistema de archivos (`NTFS`, `FAT32`, etc.), espacio libre/total y medidor de uso visual.
+- **Explorador Visual de Carpetas y Treemap:**
+  - Bloques proporcionales de color estilo *WinDirStat / WizTree* que representan visualmente el peso de cada subcarpeta o archivo.
+  - Navegación interactiva con migas de pan (*breadcrumbs*) y botón "Subir Nivel".
+  - Clasificación de almacenamiento por tipos de archivos: **Videos**, **Comprimidos e ISOs**, **Ejecutables**, **Documentos** e **Imágenes**.
+- **🐘 Cazador de Archivos Gigantes:**
+  - Localiza al instante los archivos más pesados del disco (> 100 MB, > 500 MB, > 1 GB o > 2 GB) con filtros rápidos.
+  - Acciones directas: **Abrir en Explorador de Windows**, **Triturar de forma segura** o **Eliminar**.
+
+---
+
+### 2. 📦 Instalador Oficial para Windows (Nuevo en v2.3)
+- **Instalador Completo (`PyCleanPro-Setup.exe`):**
+  - Script oficial Inno Setup 6 ([`installer.iss`](file:///installer.iss)) para generar un instalador con asistente moderno en español e inglés.
+  - Crea accesos directos en el **Menú Inicio** y opcionalmente en el **Escritorio**.
+  - Registra el programa limpiamente en la configuración de Windows y Panel de Control ("Agregar o quitar programas").
+  - Compilación automática con [`build_installer.py`](file:///build_installer.py) o mediante el menú de [`build.bat`](file:///build.bat).
+  - Integrado en el flujo de CI/CD de GitHub Actions para publicar tanto el ejecutable portable como el instalador Setup en cada release.
+
+---
+
+### 3. Limpieza Inteligente y Segura (20 Categorías)
 - **Filtro de Antigüedad por Seguridad (Retention Filter):** Protege archivos temporales modificados recientemente (< 24 horas por defecto) para no dañar instaladores en ejecución o descargas activas.
 - **Protección contra Directory Junctions (Puntos de Montaje):** Previene atravesar o eliminar carpetas vinculadas que apunten a documentos personales o discos externos.
 - **Detección de Procesos en Ejecución:** Avisa en tiempo real si Chrome, Edge, Firefox, Spotify o Discord están abiertos para evitar bloqueos y corrupción de datos de caché.
@@ -30,7 +53,7 @@ Una aplicación profesional, moderna, rápida y segura desarrollada en Python pa
 
 ---
 
-### 2. Desinstalador Limpio y Mantenimiento Avanzado (Nuevo en v2.2)
+### 4. Desinstalador Limpio y Mantenimiento Avanzado
 - **📦 Desinstalador Limpio de Aplicaciones con Escáner de Residuos:**
   - Cataloga todas las aplicaciones instaladas en Windows desde el Registro (`HKLM`, `HKCU` y `Wow6432Node`).
   - Permite buscar en tiempo real, visualizar tamaño estimado y ejecutar desinstalaciones nativas.
@@ -44,12 +67,12 @@ Una aplicación profesional, moderna, rápida y segura desarrollada en Python pa
 
 ---
 
-### 3. Dashboard Gráfico Interactivo y Moderno (Animaciones GSAP + PyWebView)
+### 5. Dashboard Gráfico Interactivo y Moderno (Animaciones GSAP + PyWebView)
 - **Interfaz Moderna con GSAP (GreenSock Animation Platform):**
   - Gráficos SVG circulares animados con easing dinámico para Disco y Memoria RAM.
   - Contadores de bytes y archivos animados en tiempo real (`0 B` -> `XX.XX GB`).
   - Banner dinámico de advertencia cuando hay navegadores en ejecución.
-  - Pestañas de **Desinstalador**, **Privacidad**, **Herramientas Avanzadas** (Triturador y Duplicados) y **Ajustes**.
+  - Pestañas de **Mapa de Disco**, **Desinstalador**, **Privacidad**, **Herramientas Avanzadas** (Triturador y Duplicados) y **Ajustes**.
   - Botón de **Exportación de Informes** de diagnóstico a formatos `.json` o `.txt`.
   - Consola de logs integrada y colapsable con auto-scroll y etiquetas cromáticas.
 - **Soporte Multi-Disco:** Selector dinámico de unidades (`C:\`, `D:\`, etc.) con estadísticas en gigabytes y porcentaje en tiempo real.
@@ -57,7 +80,7 @@ Una aplicación profesional, moderna, rápida y segura desarrollada en Python pa
 
 ---
 
-### 4. Herramientas Avanzadas de Rendimiento y Seguridad
+### 6. Herramientas Avanzadas de Rendimiento y Seguridad
 - **🗑️ Triturador Seguro de Archivos (File Shredder):**
   - Sobrescribe el contenido de archivos confidenciales con bytes aleatorios (`os.urandom`) y ceros antes de desenlazarlos del sistema de archivos, impidiendo su recuperación forense (soporta 1 pasada rápida o 3 pasadas estándar DoD 5220.22-M).
 - **🔍 Buscador de Archivos Duplicados (Duplicate Finder):**
@@ -72,11 +95,11 @@ Una aplicación profesional, moderna, rápida y segura desarrollada en Python pa
 
 ---
 
-### 5. Estabilidad, Testing y CI/CD Automático
+### 7. Estabilidad, Testing y CI/CD Automático
 - **Cero bloqueos en desarrollo:** Compatibilidad multiplataforma y stubs para `winreg`/`ctypes` que permiten ejecutar tests y desarrollo en cualquier sistema operativo.
-- **Suite de Pruebas Automatizadas:** 10 tests unitarios en `tests/` que validan seguridad, cálculo de antigüedad, triturador, duplicados, auditoría de descargas y fallbacks.
-- **Compilador a Ejecutable Portable (.exe):** Script incluido con PyInstaller (`build_exe.py` / `build.bat`) para generar un único ejecutable sin necesidad de instalar Python en el equipo de destino.
-- **GitHub Actions CI/CD ([`.github/workflows/build-release.yml`](file:///.github/workflows/build-release.yml)):** Flujo automático en `windows-latest` que compila el binario `PyCleanPro.exe` y lo adjunta como asset descargable en los Releases de GitHub al crear tags `v*`.
+- **Suite de Pruebas Automatizadas:** 13 tests unitarios en `tests/` que validan seguridad, cálculo de antigüedad, triturador, duplicados, auditoría de descargas, mapa de disco, treemap y fallbacks.
+- **Compilador a Ejecutable Portable e Instalador Setup:** Scripts incluidos con PyInstaller e Inno Setup (`build_exe.py`, `build_installer.py`, `build.bat`) para compilar binarios sin necesidad de Python instalado.
+- **GitHub Actions CI/CD ([`.github/workflows/build-release.yml`](file:///.github/workflows/build-release.yml)):** Flujo automático en `windows-latest` que compila tanto `PyCleanPro.exe` como `PyCleanPro-Setup.exe` y los adjunta como assets descargables en los Releases de GitHub al crear tags `v*`.
 
 ---
 

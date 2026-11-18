@@ -53,6 +53,16 @@
           <span>Inicio Rápido</span>
         </button>
 
+        <button class="nav-item" data-tab="tab-disk-map">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+            <line x1="6" y1="6" x2="6.01" y2="6"/>
+            <line x1="6" y1="18" x2="6.01" y2="18"/>
+          </svg>
+          <span>Mapa de Disco</span>
+        </button>
+
         <button class="nav-item" data-tab="tab-uninstaller">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
@@ -277,6 +287,110 @@
                 </thead>
                 <tbody id="startup-tbody">
                   <tr><td colspan="5" class="table-loading">Cargando programas de inicio...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- Vista: Mapa de Almacenamiento, Particiones y Treemap -->
+        <section class="tab-view" id="tab-disk-map">
+          <div class="view-header">
+            <div>
+              <h2>Mapa de Almacenamiento y Particiones</h2>
+              <p>Visualiza el uso de disco, navega por las carpetas más pesadas y localiza archivos gigantes.</p>
+            </div>
+            <div class="view-tools">
+              <button class="btn-tool" id="btn-refresh-partitions">🔄 Actualizar Discos</button>
+            </div>
+          </div>
+
+          <!-- 1. Tarjetas de Particiones del Sistema -->
+          <div style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 10px;">
+            Unidades de Disco Conectadas
+          </div>
+          <div class="partitions-grid" id="partitions-grid">
+            <div class="table-loading">Cargando particiones del sistema...</div>
+          </div>
+
+          <!-- 2. Navegador de Carpetas y Treemap Visual -->
+          <div class="card" style="margin-top: 20px;">
+            <div class="treemap-header">
+              <div>
+                <h3>Explorador de Jerarquía y Mapa de Carpetas</h3>
+                <p class="setting-desc">Haz clic en una carpeta para analizar su peso interior o subir de nivel.</p>
+              </div>
+              <div class="treemap-nav-controls">
+                <button class="btn-tool" id="btn-treemap-up" title="Subir al directorio superior" disabled>⬆ Subir Nivel</button>
+                <div class="treemap-path-badge" id="treemap-current-path">C:\</div>
+                <button class="btn-primary" id="btn-treemap-scan" style="padding: 6px 14px; font-size: 12px;">Escanear</button>
+              </div>
+            </div>
+
+            <!-- Resumen de categorías en esta carpeta -->
+            <div class="category-pills-container" id="category-pills-container">
+              <!-- Renderizado dinámico de píldoras de categorías -->
+            </div>
+
+            <!-- Visualizador Treemap de Bloques -->
+            <div class="treemap-visual-container">
+              <div class="treemap-bars" id="treemap-bars">
+                <!-- Bloques proporcionales de colores -->
+              </div>
+            </div>
+
+            <!-- Lista interactiva de subcarpetas y archivos -->
+            <div class="treemap-list-container">
+              <div class="table-container" style="max-height: 280px;">
+                <table class="modern-table">
+                  <thead>
+                    <tr>
+                      <th>Nombre</th>
+                      <th>Tipo</th>
+                      <th>Tamaño</th>
+                      <th>Proporción</th>
+                      <th style="text-align: right;">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="treemap-tbody">
+                    <tr><td colspan="5" class="table-loading">Selecciona una unidad o carpeta para analizar.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Cazador de Archivos Gigantes -->
+          <div class="card" style="margin-top: 20px;">
+            <div class="treemap-header">
+              <div>
+                <h3>Cazador de Archivos Gigantes</h3>
+                <p class="setting-desc">Encuentra al instante archivos individuales enormes que consumen tu espacio.</p>
+              </div>
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <label for="largest-min-size" style="font-size: 12px; color: var(--text-muted);">Mínimo:</label>
+                <select id="largest-min-size" class="modern-input" style="width: 140px;">
+                  <option value="100">Mayor a 100 MB</option>
+                  <option value="500" selected>Mayor a 500 MB</option>
+                  <option value="1024">Mayor a 1 GB</option>
+                  <option value="2048">Mayor a 2 GB</option>
+                </select>
+                <button class="btn-primary" id="btn-find-largest">Buscar Archivos</button>
+              </div>
+            </div>
+
+            <div class="table-container" style="max-height: 320px; margin-top: 14px;">
+              <table class="modern-table">
+                <thead>
+                  <tr>
+                    <th>Archivo</th>
+                    <th>Tamaño</th>
+                    <th>Ubicación</th>
+                    <th style="text-align: right;">Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="largest-tbody">
+                  <tr><td colspan="4" class="table-loading">Pulsa "Buscar Archivos" para rastrear la unidad actual.</td></tr>
                 </tbody>
               </table>
             </div>

@@ -6,6 +6,7 @@ automatización, exportación de reportes, triturador seguro y buscador de dupli
 
 from __future__ import annotations
 
+import os
 import sys
 import argparse
 import json
@@ -161,6 +162,13 @@ def run_cli(args):
         if args.startup:
             result["actions"]["startup_programs"] = cleaner.get_startup_programs()
 
+        if args.partitions:
+            result["actions"]["partitions"] = cleaner.get_partitions_detailed()
+
+        if args.largest is not None:
+            target_dir = args.largest if os.path.exists(args.largest) else ("C:\\" if sys.platform == "win32" else "/")
+            result["actions"]["largest_files"] = cleaner.find_largest_files(target_dir, min_size_mb=100, limit=50)
+
         if args.export:
             cleaner.export_report(result, args.export, format_type="json")
 
@@ -169,7 +177,7 @@ def run_cli(args):
 
     # Salida estándar legible para humanos
     print("=" * 65)
-    print("           ⚡ PyClean Pro v2.1 - Modo Consola (CLI)")
+    print("           ⚡ PyClean Pro v2.3 - Modo Consola (CLI)")
     print("=" * 65)
 
     admin_status = "Administrador" if cleaner.is_admin() else "Usuario Estándar (limitado)"
@@ -190,6 +198,25 @@ def run_cli(args):
     drive_label = target_drive[:2] if len(target_drive) >= 2 else target_drive
     print(f"Disco {drive_label}: {free_gb:.1f} GB libres de {total_gb:.1f} GB ({stats['disk_percent']}% en uso)")
     print(f"Memoria RAM en uso: {stats['ram_load']}%\n")
+
+    if args.partitions:
+        parts = cleaner.get_partitions_detailed()
+        print("[+] Particiones y unidades de disco detectadas:")
+        for p in parts:
+            print(f"    • [{p['letter']}] {p['label']:<18} | {p['fs']:<6} | {p['type']:<15} | Libre: {p['free_formatted']:>9} ({p['percent']}% en uso)")
+        print()
+
+    if args.largest is not None:
+        target_dir = args.largest if os.path.exists(args.largest) else ("C:\\" if sys.platform == "win32" else "/")
+        print(f"[+] Buscando archivos gigantes en {target_dir}...")
+        files = cleaner.find_largest_files(target_dir, min_size_mb=100, limit=20)
+        if not files:
+            print("    ✔ No se encontraron archivos superiores a 100 MB.\n")
+        else:
+            for f in files:
+                print(f"    • {f['size_formatted']:>10} | {f['name']}")
+                print(f"      {f['path']}")
+            print()
 
     if args.startup:
         print("[+] Programas configurados para iniciar con Windows:")
@@ -315,6 +342,8 @@ def main():
     parser.add_argument("--downloads-audit", type=int, nargs="?", const=30, metavar="DAYS", help="Auditar instaladores pesados en Descargas con más de X días (default: 30)")
     parser.add_argument("--schedule", type=str, choices=["on", "off"], metavar="STATE", help="Activar o desactivar tarea semanal de mantenimiento automático (on/off)")
     parser.add_argument("--privacy", type=str, choices=["on", "off"], metavar="STATE", help="Mitigar o restaurar telemetría y diagnósticos de Windows (on/off)")
+    parser.add_argument("--partitions", action="store_true", help="Mostrar información detallada de particiones y unidades de disco")
+    parser.add_argument("--largest", type=str, nargs="?", const="C:\\", metavar="DIR", help="Buscar archivos gigantes en el directorio o unidad (ej. --largest D:\\)")
     parser.add_argument("--export", type=str, metavar="PATH", help="Ruta donde exportar el informe de resultados (.json o .txt)")
     parser.add_argument("--json", action="store_true", help="Emitir resultados en formato JSON estructurado")
     parser.add_argument("--all", action="store_true", help="Ejecutar escaneo, limpieza, optimización de RAM y DNS")
@@ -341,6 +370,8 @@ def main():
         or (args.downloads_audit is not None)
         or args.schedule
         or args.privacy
+        or args.partitions
+        or (args.largest is not None)
     ):
         run_cli(args)
     else:

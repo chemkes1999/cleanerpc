@@ -1385,3 +1385,294 @@ def audit_old_downloads(min_age_days: int = 30) -> list[dict]:
 
     old_items.sort(key=lambda x: x["size"], reverse=True)
     return old_items
+
+
+# --- v2.3: Analizador Visual de Almacenamiento, Particiones y Treemap ---
+
+FILE_CATEGORIES = {
+    "Videos": {".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v"},
+    "Imágenes": {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".ico", ".psd", ".raw"},
+    "Comprimidos e ISOs": {".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".iso", ".vmdk", ".vhdx", ".img"},
+    "Ejecutables e Instaladores": {".exe", ".msi", ".dll", ".sys", ".bat", ".cmd", ".ps1", ".vbs"},
+    "Documentos": {".pdf", ".docx", ".doc", ".xlsx", ".xls", ".pptx", ".ppt", ".txt", ".csv", ".rtf", ".epub"},
+    "Desarrollo y Código": {".py", ".js", ".ts", ".html", ".css", ".json", ".xml", ".java", ".cpp", ".c", ".h", ".cs", ".php", ".go", ".rs", ".sql"}
+}
+
+
+def get_partitions_detailed() -> list[dict]:
+    """
+    Retorna información enriquecida sobre todas las particiones del sistema:
+    etiqueta de volumen, tipo de sistema de archivos (NTFS, FAT32), capacidad total,
+    espacio usado/libre y porcentaje.
+    """
+    partitions = []
+    if sys.platform == "win32" and hasattr(ctypes, "windll"):
+        try:
+            bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+            for i in range(26):
+                if bitmask & (1 << i):
+                    drive_letter = f"{chr(65 + i)}:\\"
+                    drive_type = ctypes.windll.kernel32.GetDriveTypeW(drive_letter)
+                    # 2: Removable, 3: Fixed, 4: Remote/Network, 5: CD-ROM, 6: RAMDisk
+                    type_labels = {
+                        2: "Extraíble (USB)",
+                        3: "Disco Local",
+                        4: "Unidad de Red",
+                        5: "Unidad Óptica (CD/DVD)",
+                        6: "RAMDisk"
+                    }
+                    type_str = type_labels.get(drive_type, "Desconocido")
+
+                    vol_name = ctypes.create_unicode_buffer(261)
+                    fs_name = ctypes.create_unicode_buffer(261)
+                    serial = ctypes.c_ulong()
+                    max_len = ctypes.c_ulong()
+                    flags = ctypes.c_ulong()
+
+                    has_vol_info = ctypes.windll.kernel32.GetVolumeInformationW(
+                        drive_letter,
+                        vol_name,
+                        ctypes.sizeof(vol_name),
+                        ctypes.byref(serial),
+                        ctypes.byref(max_len),
+                        ctypes.byref(flags),
+                        fs_name,
+                        ctypes.sizeof(fs_name)
+                    )
+
+                    label = vol_name.value if has_vol_info and vol_name.value else "Disco Local"
+                    fs = fs_name.value if has_vol_info and fs_name.value else "NTFS"
+
+                    try:
+                        total, used, free = shutil.disk_usage(drive_letter)
+                        pct = round((used / total) * 100, 1) if total > 0 else 0.0
+                        partitions.append({
+                            "letter": drive_letter,
+                            "label": label,
+                            "fs": fs,
+                            "type": type_str,
+                            "total": total,
+                            "used": used,
+                            "free": free,
+                            "total_formatted": format_size(total),
+                            "used_formatted": format_size(used),
+                            "free_formatted": format_size(free),
+                            "percent": pct
+                        })
+                    except Exception:
+                        pass
+        except Exception as e:
+            logger.debug("Error obteniendo particiones detalladas: %s", e)
+
+    if not partitions:
+        root_path = "C:\\" if sys.platform == "win32" else "/"
+        try:
+            total, used, free = shutil.disk_usage(root_path)
+            pct = round((used / total) * 100, 1) if total > 0 else 0.0
+            partitions.append({
+                "letter": root_path,
+                "label": "Sistema Principal",
+                "fs": "NTFS" if sys.platform == "win32" else "ext4",
+                "type": "Disco Local",
+                "total": total,
+                "used": used,
+                "free": free,
+                "total_formatted": format_size(total),
+                "used_formatted": format_size(used),
+                "free_formatted": format_size(free),
+                "percent": pct
+            })
+        except Exception:
+            pass
+
+    return partitions
+
+
+def _get_dir_size_fast(path: str, max_depth: int = 3, max_files: int = 5000) -> tuple[int, int]:
+    """Calcula el tamaño de una carpeta de forma rápida y segura sin bucles infinitos."""
+    total_size = 0
+    file_count = 0
+    stack = [(path, 0)]
+
+    while stack and file_count < max_files:
+        current_dir, depth = stack.pop()
+        try:
+            with os.scandir(current_dir) as entries:
+                for entry in entries:
+                    try:
+                        if is_safe_link_or_junction(entry.path):
+                            continue
+                        if entry.is_file(follow_symlinks=False):
+                            total_size += entry.stat(follow_symlinks=False).st_size
+                            file_count += 1
+                        elif entry.is_dir(follow_symlinks=False) and depth < max_depth:
+                            stack.append((entry.path, depth + 1))
+                    except (PermissionError, OSError):
+                        continue
+        except (PermissionError, OSError):
+            continue
+
+    return total_size, file_count
+
+
+def scan_folder_treemap(target_path: str) -> dict:
+    """
+    Analiza una carpeta o unidad para generar un mapa jerárquico de carpetas y archivos,
+    calculando pesos relativos y categorías para el visualizador Treemap.
+    """
+    target = os.path.abspath(target_path)
+    if not os.path.exists(target):
+        return {"error": f"La ruta no existe: {target}", "items": [], "categories": []}
+
+    items = []
+    cat_sizes = {cat: 0 for cat in FILE_CATEGORIES}
+    cat_sizes["Otros"] = 0
+    total_folder_size = 0
+
+    parent_path = os.path.dirname(target) if os.path.dirname(target) != target else None
+
+    try:
+        with os.scandir(target) as entries:
+            for entry in entries:
+                try:
+                    if is_safe_link_or_junction(entry.path):
+                        continue
+
+                    if entry.is_dir(follow_symlinks=False):
+                        dir_size, dir_files = _get_dir_size_fast(entry.path)
+                        total_folder_size += dir_size
+                        items.append({
+                            "name": entry.name,
+                            "path": entry.path,
+                            "is_dir": True,
+                            "size": dir_size,
+                            "size_formatted": format_size(dir_size),
+                            "count": dir_files,
+                            "type": "Carpeta"
+                        })
+                    elif entry.is_file(follow_symlinks=False):
+                        stat = entry.stat(follow_symlinks=False)
+                        f_size = stat.st_size
+                        total_folder_size += f_size
+                        ext = Path(entry.name).suffix.lower()
+
+                        matched_cat = "Otros"
+                        for cat_name, ext_set in FILE_CATEGORIES.items():
+                            if ext in ext_set:
+                                matched_cat = cat_name
+                                break
+                        cat_sizes[matched_cat] += f_size
+
+                        items.append({
+                            "name": entry.name,
+                            "path": entry.path,
+                            "is_dir": False,
+                            "size": f_size,
+                            "size_formatted": format_size(f_size),
+                            "count": 1,
+                            "type": matched_cat,
+                            "ext": ext
+                        })
+                except (PermissionError, OSError):
+                    continue
+    except (PermissionError, OSError) as e:
+        return {"error": f"Acceso denegado a {target}: {e}", "items": [], "categories": []}
+
+    items.sort(key=lambda x: x["size"], reverse=True)
+    for item in items:
+        item["percent"] = round((item["size"] / total_folder_size * 100), 1) if total_folder_size > 0 else 0.0
+
+    formatted_cats = []
+    for cat_name, cat_bytes in cat_sizes.items():
+        if cat_bytes > 0:
+            pct = round((cat_bytes / total_folder_size * 100), 1) if total_folder_size > 0 else 0.0
+            formatted_cats.append({
+                "category": cat_name,
+                "size": cat_bytes,
+                "size_formatted": format_size(cat_bytes),
+                "percent": pct
+            })
+    formatted_cats.sort(key=lambda x: x["size"], reverse=True)
+
+    return {
+        "current_path": target,
+        "parent_path": parent_path,
+        "name": os.path.basename(target) or target,
+        "total_size": total_folder_size,
+        "total_size_formatted": format_size(total_folder_size),
+        "items": items,
+        "categories": formatted_cats
+    }
+
+
+def find_largest_files(target_path: str, min_size_mb: int = 100, limit: int = 50) -> list[dict]:
+    """
+    Escanea recursivamente una ruta en busca de los archivos más pesados del sistema (>= min_size_mb).
+    Retorna el top N de archivos gigantes ordenados por tamaño.
+    """
+    target = os.path.abspath(target_path)
+    if not os.path.exists(target):
+        return []
+
+    min_bytes = max(1, min_size_mb) * 1024 * 1024
+    largest_files = []
+
+    try:
+        for root, dirs, files in os.walk(target, topdown=True, followlinks=False):
+            dirs[:] = [d for d in dirs if not is_safe_link_or_junction(os.path.join(root, d))]
+
+            for file_name in files:
+                file_path = os.path.join(root, file_name)
+                try:
+                    if is_safe_link_or_junction(file_path):
+                        continue
+                    stat = os.stat(file_path, follow_symlinks=False)
+                    if stat.st_size >= min_bytes:
+                        ext = Path(file_name).suffix.lower()
+                        largest_files.append({
+                            "name": file_name,
+                            "path": file_path,
+                            "dir": root,
+                            "size": stat.st_size,
+                            "size_formatted": format_size(stat.st_size),
+                            "ext": ext,
+                            "mtime": stat.st_mtime
+                        })
+                except (PermissionError, OSError):
+                    continue
+    except (PermissionError, OSError):
+        pass
+
+    largest_files.sort(key=lambda x: x["size"], reverse=True)
+    return largest_files[:limit]
+
+
+def open_in_explorer(target_path: str) -> bool:
+    """Abre la ruta o selecciona el archivo en el Explorador de archivos nativo del SO."""
+    if not os.path.exists(target_path):
+        return False
+
+    abs_path = os.path.abspath(target_path)
+    if sys.platform == "win32":
+        try:
+            if os.path.isfile(abs_path):
+                subprocess.Popen(["explorer.exe", f"/select,{abs_path}"])
+            else:
+                subprocess.Popen(["explorer.exe", abs_path])
+            return True
+        except Exception:
+            return False
+    elif sys.platform == "darwin":
+        try:
+            cmd = ["open", "-R", abs_path] if os.path.isfile(abs_path) else ["open", abs_path]
+            subprocess.Popen(cmd)
+            return True
+        except Exception:
+            return False
+    else:
+        try:
+            folder = os.path.dirname(abs_path) if os.path.isfile(abs_path) else abs_path
+            subprocess.Popen(["xdg-open", folder])
+            return True
+        except Exception:
+            return False

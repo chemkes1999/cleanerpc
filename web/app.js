@@ -17,6 +17,9 @@ const AppState = {
   heavyFiles: [],
   installedApps: [],
   currentLeftovers: [],
+  currentTreemapPath: "C:\\",
+  currentTreemapParent: null,
+  treemapInitialized: false,
   isBusy: false,
   logOpen: true
 };
@@ -761,7 +764,16 @@ function setupEventListeners() {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
-      animateTabTransition(btn.dataset.tab);
+      const tabId = btn.dataset.tab;
+      animateTabTransition(tabId);
+
+      if (tabId === "tab-disk-map") {
+        loadPartitionsView();
+        if (!AppState.treemapInitialized) {
+          AppState.treemapInitialized = true;
+          loadTreemapPath(AppState.selectedDrive || "C:\\");
+        }
+      }
     });
   });
 
@@ -1197,6 +1209,36 @@ function setupEventListeners() {
       }
     });
   }
+
+  // --- v2.3: Eventos del Mapa de Almacenamiento, Particiones y Treemap ---
+  const btnRefreshPartitions = document.getElementById("btn-refresh-partitions");
+  if (btnRefreshPartitions) {
+    btnRefreshPartitions.addEventListener("click", loadPartitionsView);
+  }
+
+  const btnTreemapUp = document.getElementById("btn-treemap-up");
+  if (btnTreemapUp) {
+    btnTreemapUp.addEventListener("click", () => {
+      if (AppState.currentTreemapParent) {
+        loadTreemapPath(AppState.currentTreemapParent);
+      }
+    });
+  }
+
+  const btnTreemapScan = document.getElementById("btn-treemap-scan");
+  if (btnTreemapScan) {
+    btnTreemapScan.addEventListener("click", () => {
+      loadTreemapPath(AppState.currentTreemapPath || AppState.selectedDrive || "C:\\");
+    });
+  }
+
+  const btnFindLargest = document.getElementById("btn-find-largest");
+  if (btnFindLargest) {
+    btnFindLargest.addEventListener("click", () => {
+      const minMb = parseInt(document.getElementById("largest-min-size").value) || 500;
+      loadLargestFilesHunter(AppState.currentTreemapPath || AppState.selectedDrive || "C:\\", minMb);
+    });
+  }
 }
 
 // --- v2.2: Funciones del Desinstalador de Aplicaciones ---
@@ -1360,6 +1402,261 @@ async function loadSchedulerStatus() {
     statusText.textContent = `Error al consultar tarea: ${err}`;
   }
 }
+
+// --- v2.3: Funciones del Mapa de Almacenamiento, Particiones y Treemap ---
+
+const TREEMAP_COLORS = [
+  "#3B82F6", "#06B6D4", "#8B5CF6", "#10B981", "#F59E0B",
+  "#EC4899", "#6366F1", "#14B8A6", "#F97316", "#84CC16"
+];
+
+async function loadPartitionsView() {
+  const container = document.getElementById("partitions-grid");
+  if (!container) return;
+
+  try {
+    let partitions = [];
+    if (window.pywebview) {
+      partitions = await window.pywebview.api.get_partitions_detailed();
+    }
+    container.innerHTML = "";
+
+    if (!partitions || partitions.length === 0) {
+      container.innerHTML = `<div class="table-loading">No se encontraron particiones disponibles.</div>`;
+      return;
+    }
+
+    partitions.forEach(part => {
+      const card = document.createElement("div");
+      const isSelected = part.letter === AppState.currentTreemapPath;
+      card.className = `partition-card ${isSelected ? "active" : ""}`;
+
+      const pct = part.percent || 0;
+      let barColor = "var(--primary)";
+      if (pct > 88) barColor = "var(--danger)";
+      else if (pct > 75) barColor = "var(--warning)";
+
+      card.innerHTML = `
+        <div class="partition-top">
+          <div class="partition-drive">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+              <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+              <line x1="6" y1="6" x2="6.01" y2="6"/>
+              <line x1="6" y1="18" x2="6.01" y2="18"/>
+            </svg>
+            <span>${escapeHtml(part.letter)}</span>
+          </div>
+          <span class="partition-fs">${escapeHtml(part.fs)}</span>
+        </div>
+        <div class="partition-label">${escapeHtml(part.label)} (${escapeHtml(part.type)})</div>
+        <div class="partition-bar">
+          <div class="partition-bar-fill" style="width: ${pct}%; background: ${barColor};"></div>
+        </div>
+        <div class="partition-meta">
+          <span>Libre: <strong>${escapeHtml(part.free_formatted)}</strong></span>
+          <span>${pct}% de ${escapeHtml(part.total_formatted)}</span>
+        </div>
+      `;
+
+      card.addEventListener("click", () => {
+        document.querySelectorAll(".partition-card").forEach(c => c.classList.remove("active"));
+        card.classList.add("active");
+        loadTreemapPath(part.letter);
+      });
+
+      container.appendChild(card);
+    });
+  } catch (err) {
+    container.innerHTML = `<div class="table-loading" style="color: var(--danger);">Error cargando particiones: ${escapeHtml(String(err))}</div>`;
+  }
+}
+
+async function loadTreemapPath(targetPath) {
+  AppState.currentTreemapPath = targetPath;
+  const pathBadge = document.getElementById("treemap-current-path");
+  const btnUp = document.getElementById("btn-treemap-up");
+  const pillsContainer = document.getElementById("category-pills-container");
+  const barsContainer = document.getElementById("treemap-bars");
+  const tbody = document.getElementById("treemap-tbody");
+
+  if (pathBadge) pathBadge.textContent = targetPath;
+  if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="table-loading">Analizando contenido de ${escapeHtml(targetPath)}...</td></tr>`;
+
+  try {
+    let data = { items: [], categories: [] };
+    if (window.pywebview) {
+      data = await window.pywebview.api.scan_folder_treemap(targetPath);
+    }
+    if (data.error) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="table-loading" style="color: var(--warning);">${escapeHtml(data.error)}</td></tr>`;
+      return;
+    }
+
+    AppState.currentTreemapParent = data.parent_path;
+    if (btnUp) {
+      btnUp.disabled = !data.parent_path;
+    }
+
+    // 1. Renderizar Píldoras de Categorías
+    if (pillsContainer) {
+      pillsContainer.innerHTML = "";
+      if (data.categories && data.categories.length > 0) {
+        data.categories.forEach((cat, idx) => {
+          const color = TREEMAP_COLORS[idx % TREEMAP_COLORS.length];
+          const pill = document.createElement("div");
+          pill.className = "category-pill";
+          pill.innerHTML = `
+            <span class="category-pill-dot" style="background: ${color};"></span>
+            <span>${escapeHtml(cat.category)}: <strong>${escapeHtml(cat.size_formatted)}</strong> (${cat.percent}%)</span>
+          `;
+          pillsContainer.appendChild(pill);
+        });
+      }
+    }
+
+    // 2. Renderizar Bloques Visuales Treemap
+    if (barsContainer) {
+      barsContainer.innerHTML = "";
+      const items = data.items || [];
+      if (items.length === 0) {
+        barsContainer.innerHTML = `<div style="padding: 6px 12px; font-size: 11px; color: var(--text-muted);">Carpeta vacía o sin elementos accesibles.</div>`;
+      } else {
+        items.slice(0, 15).forEach((item, idx) => {
+          const color = item.is_dir ? TREEMAP_COLORS[idx % TREEMAP_COLORS.length] : "var(--text-dim)";
+          const block = document.createElement("div");
+          block.className = "treemap-block";
+          const widthPct = Math.max(2, item.percent || 1);
+          block.style.width = `${widthPct}%`;
+          block.style.background = color;
+          block.title = `${item.name} (${item.size_formatted} - ${item.percent}%)`;
+          block.textContent = item.percent >= 4 ? item.name : "";
+
+          if (item.is_dir) {
+            block.addEventListener("click", () => loadTreemapPath(item.path));
+          }
+          barsContainer.appendChild(block);
+        });
+      }
+    }
+
+    // 3. Renderizar Tabla de Elementos
+    if (tbody) {
+      tbody.innerHTML = "";
+      const items = data.items || [];
+      if (items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="table-loading">No hay archivos ni carpetas en esta ubicación.</td></tr>`;
+        return;
+      }
+
+      items.forEach(item => {
+        const tr = document.createElement("tr");
+        const icon = item.is_dir 
+          ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px; color: var(--accent-cyan);"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`
+          : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px; color: var(--text-muted);"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+
+        tr.innerHTML = `
+          <td style="font-weight: 500;">
+            ${icon}
+            <span title="${escapeHtml(item.path)}">${escapeHtml(item.name)}</span>
+          </td>
+          <td><span class="badge ${item.is_dir ? 'badge-primary' : 'badge-dim'}">${escapeHtml(item.type)}</span></td>
+          <td><strong>${escapeHtml(item.size_formatted)}</strong></td>
+          <td>
+            <div class="treemap-size-bar">
+              <div class="treemap-size-fill" style="width: ${Math.min(100, item.percent || 0)}%;"></div>
+            </div>
+            <span style="font-size: 11px; color: var(--text-muted);">${item.percent}%</span>
+          </td>
+          <td style="text-align: right;">
+            ${item.is_dir 
+              ? `<button class="btn-action-sm btn-nav-dir">Entrar ➔</button>` 
+              : `<button class="btn-tool btn-open-file" style="padding: 3px 8px; font-size: 11px;">📁 Abrir</button>`}
+          </td>
+        `;
+
+        if (item.is_dir) {
+          tr.querySelector(".btn-nav-dir").addEventListener("click", () => loadTreemapPath(item.path));
+        } else {
+          tr.querySelector(".btn-open-file").addEventListener("click", () => {
+            window.pywebview.api.open_in_explorer(item.path);
+          });
+        }
+
+        tbody.appendChild(tr);
+      });
+    }
+
+  } catch (err) {
+    if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="table-loading" style="color: var(--danger);">Fallo al explorar ruta: ${escapeHtml(String(err))}</td></tr>`;
+  }
+}
+
+async function loadLargestFilesHunter(targetPath, minMb) {
+  const tbody = document.getElementById("largest-tbody");
+  if (!tbody) return;
+
+  tbody.innerHTML = `<tr><td colspan="4" class="table-loading">Escaneando ${escapeHtml(targetPath)} en busca de archivos mayores a ${minMb} MB...</td></tr>`;
+  addLog(`Buscando archivos mayores a ${minMb} MB en ${targetPath}...`, "info");
+
+  try {
+    let files = [];
+    if (window.pywebview) {
+      files = await window.pywebview.api.find_largest_files(targetPath, minMb, 50);
+    }
+    tbody.innerHTML = "";
+
+    if (!files || files.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" class="table-loading">✔ No se encontraron archivos superiores a ${minMb} MB.</td></tr>`;
+      addLog(`Cazador de archivos: 0 archivos gigantes encontrados.`, "success");
+      return;
+    }
+
+    addLog(`Cazador de archivos: ${files.length} archivos detectados.`, "warning");
+
+    files.forEach(f => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td style="font-weight: 500;">
+          <span title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
+        </td>
+        <td><strong style="color: var(--accent-cyan);">${escapeHtml(f.size_formatted)}</strong></td>
+        <td style="font-family: Consolas, monospace; font-size: 11px; color: var(--text-muted); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(f.path)}">
+          ${escapeHtml(f.path)}
+        </td>
+        <td style="text-align: right; white-space: nowrap;">
+          <button class="btn-tool btn-open-largest" style="padding: 3px 8px; font-size: 11px; margin-right: 4px;">📁 Abrir</button>
+          <button class="btn-tool btn-shred-largest" style="padding: 3px 8px; font-size: 11px; background: rgba(239, 68, 68, 0.15); color: var(--danger); border-color: rgba(239, 68, 68, 0.3);">⚡ Triturar</button>
+        </td>
+      `;
+
+      tr.querySelector(".btn-open-largest").addEventListener("click", () => {
+        window.pywebview.api.open_in_explorer(f.path);
+      });
+
+      tr.querySelector(".btn-shred-largest").addEventListener("click", async () => {
+        if (!confirm(`¿Estás seguro de triturar irrecuperablemente:\n\n${f.name} (${f.size_formatted})?`)) return;
+        addLog(`Triturando archivo gigante: ${f.name}...`, "warning");
+        try {
+          const res = await window.pywebview.api.delete_or_shred_file(f.path, true);
+          if (res.success) {
+            addLog(`Triturado: ${f.name}`, "success");
+            tr.remove();
+          } else {
+            addLog(`Error al triturar: ${res.message}`, "error");
+          }
+        } catch (e) {
+          addLog(`Fallo al triturar archivo: ${e}`, "error");
+        }
+      });
+
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="4" class="table-loading" style="color: var(--danger);">Error buscando archivos: ${escapeHtml(String(err))}</td></tr>`;
+  }
+}
+
 
 function escapeHtml(str) {
   if (!str) return "";

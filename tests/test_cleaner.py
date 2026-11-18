@@ -195,3 +195,57 @@ def test_v22_fallbacks():
 
     apps = cleaner.get_installed_apps()
     assert isinstance(apps, list)
+
+
+def test_get_partitions_detailed():
+    partitions = cleaner.get_partitions_detailed()
+    assert isinstance(partitions, list)
+    assert len(partitions) >= 1
+    p = partitions[0]
+    assert "letter" in p
+    assert "total" in p
+    assert "free" in p
+    assert "fs" in p
+    assert "percent" in p
+
+
+def test_scan_folder_treemap():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Crear subdirectorios y archivos
+        sub1 = os.path.join(temp_dir, "Videos")
+        sub2 = os.path.join(temp_dir, "Docs")
+        os.makedirs(sub1)
+        os.makedirs(sub2)
+
+        vid_file = os.path.join(sub1, "movie.mp4")
+        doc_file = os.path.join(sub2, "document.pdf")
+        with open(vid_file, "wb") as f:
+            f.write(b"0" * 4096)
+        with open(doc_file, "wb") as f:
+            f.write(b"0" * 2048)
+
+        data = cleaner.scan_folder_treemap(temp_dir)
+        assert data["current_path"] == temp_dir
+        assert len(data["items"]) == 2
+        names = [item["name"] for item in data["items"]]
+        assert "Videos" in names
+        assert "Docs" in names
+        assert data["total_size"] >= 6144
+
+
+def test_find_largest_files():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        big_file = os.path.join(temp_dir, "large.iso")
+        small_file = os.path.join(temp_dir, "small.txt")
+
+        # 2 MB file (para test con min_size_mb=1)
+        with open(big_file, "wb") as f:
+            f.write(b"A" * (2 * 1024 * 1024))
+        with open(small_file, "wb") as f:
+            f.write(b"B" * 512)
+
+        largest = cleaner.find_largest_files(temp_dir, min_size_mb=1, limit=10)
+        assert len(largest) == 1
+        assert largest[0]["name"] == "large.iso"
+        assert largest[0]["size"] == 2 * 1024 * 1024
+

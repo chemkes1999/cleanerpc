@@ -1,4 +1,4 @@
-name: Build & Release PyClean Pro .exe
+name: Build & Release PyClean Pro .exe & Installer
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build:
-    name: Test & Build Windows Portable Executable
+    name: Test & Build Windows Binaries
     runs-on: windows-latest
 
     steps:
@@ -33,32 +33,45 @@ jobs:
         run: |
           pytest tests/ -v
 
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup --no-progress
+
       - name: Build Executable with PyInstaller
         run: |
           python build_exe.py
 
-      - name: Verify Executable Exists
+      - name: Build Windows Setup Installer
         run: |
-          if (Test-Path "dist\PyCleanPro.exe") {
-            Write-Host "✔ PyCleanPro.exe generated successfully!"
-            Get-Item "dist\PyCleanPro.exe" | Select-Object Name, Length, LastWriteTime
+          python build_installer.py
+
+      - name: Verify Artifacts Exist
+        run: |
+          if ((Test-Path "dist\PyCleanPro.exe") -and (Test-Path "dist\PyCleanPro-Setup.exe")) {
+            Write-Host "✔ Both PyCleanPro.exe and PyCleanPro-Setup.exe generated successfully!"
+            Get-Item "dist\*" | Select-Object Name, Length, LastWriteTime
           } else {
-            Write-Error "dist\PyCleanPro.exe not found!"
+            Write-Error "Required binaries not found in dist/!"
             exit 1
           }
 
-      - name: Upload Artifact
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: PyCleanPro-Windows
-          path: dist/PyCleanPro.exe
+          name: PyCleanPro-Windows-Binaries
+          path: |
+            dist/PyCleanPro.exe
+            dist/PyCleanPro-Setup.exe
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/PyCleanPro.exe
+          files: |
+            dist/PyCleanPro.exe
+            dist/PyCleanPro-Setup.exe
           name: PyClean Pro ${{ github.ref_name }}
           generate_release_notes: true
           draft: false
           prerelease: false
+
