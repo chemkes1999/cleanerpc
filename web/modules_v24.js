@@ -540,7 +540,13 @@ function renderVaultEntries(entries) {
     });
 
     tr.querySelector(".btn-vault-del").addEventListener("click", async () => {
-      if (!confirm(`¿Eliminar definitivamente la credencial '${entry.title}'?`)) return;
+      const ok = await window.showConfirmModal({
+        title: "Eliminar credencial",
+        message: `¿Eliminar definitivamente la credencial '${entry.title}' de tu bóveda cifrada?`,
+        confirmText: "Eliminar",
+        danger: true,
+      });
+      if (!ok) return;
       const res = await window.pywebview.api.vault_delete_entry(entry.id);
       if (res.success) {
         v24Log(res.message, "success");

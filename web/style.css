@@ -776,13 +776,19 @@ input:checked + .slider:before {
   border: 1px solid var(--border);
   color: var(--text-main);
   padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 14px;
-  width: 100px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  min-height: 38px;
+  width: 100%;
   outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.modern-input.input-compact {
+  width: 96px;
 }
 .modern-input:focus {
   border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 .quick-presets {
   display: flex;
@@ -2084,6 +2090,346 @@ select.vault-input {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+   PyClean Pro v2.6 - Sidebar Agrupado, Temas (OLED/Claro), Toasts y Modales
+   ========================================================================== */
+
+.nav-menu {
+  gap: 3px;
+  padding: 12px 10px 16px;
+}
+
+.nav-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  padding: 12px 12px 4px;
+}
+
+.nav-group-label:first-child {
+  padding-top: 2px;
+}
+
+.nav-item {
+  padding: 8.5px 12px;
+  font-size: 13px;
+  gap: 10px;
+}
+
+.nav-item svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Botón Selector de Tema en Top Bar */
+.btn-theme-toggle {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.btn-theme-toggle:hover {
+  border-color: var(--primary);
+  color: var(--text-main);
+}
+
+/* Banner descartable */
+.locked-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.banner-dismiss-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 18px;
+  line-height: 1;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.75;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.banner-dismiss-btn:hover {
+  opacity: 1;
+  background: rgba(245, 158, 11, 0.22);
+}
+
+/* Contador de logs no leídos */
+.log-unread-badge {
+  background: var(--primary);
+  color: #FFF;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+/* --- Temas: OLED y Claro --- */
+body.oled-theme {
+  --bg-dark: #000000;
+  --bg-sidebar: #050608;
+  --bg-card: #0B0D14;
+  --bg-card-hover: #121622;
+  --bg-input: #040509;
+  --border: #1A1E2B;
+}
+
+body.light-theme {
+  --bg-dark: #F3F5F9;
+  --bg-sidebar: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F8FAFC;
+  --bg-input: #F1F5F9;
+  --border: #E2E8F0;
+  --text-main: #0F172A;
+  --text-muted: #475569;
+  --text-dim: #64748B;
+}
+
+body.light-theme .vault-lock-card,
+body.light-theme .vault-kpi-card {
+  background: #FFFFFF;
+  border-color: #CBD5E1;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+}
+
+body.light-theme .vault-lock-card h3,
+body.light-theme .vault-card-head h3,
+body.light-theme .vault-kpi-value,
+body.light-theme .vault-service-title,
+body.light-theme .vault-slider-head strong {
+  color: #0F172A;
+}
+
+body.light-theme .vault-field label,
+body.light-theme .vault-check-pill,
+body.light-theme .vault-user-chip {
+  color: #334155;
+}
+
+body.light-theme .vault-input,
+body.light-theme .vault-slider-box,
+body.light-theme .vault-check-pill,
+body.light-theme .vault-filter-pill {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+  color: #0F172A;
+}
+
+body.light-theme .vault-gen-output {
+  background: #0F172A;
+}
+
+body.light-theme .vault-auth-status {
+  background: #F1F5F9;
+  border-color: #CBD5E1;
+  color: #475569;
+}
+
+body.light-theme .locked-apps-banner {
+  background: #FEF3C7;
+  border-color: #F59E0B;
+  color: #92400E;
+}
+
+body.light-theme .log-terminal {
+  background: #0F172A;
+}
+
+/* --- Notificaciones Toast Flotantes --- */
+.ui-toast-container {
+  position: fixed;
+  top: 18px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+  max-width: 360px;
+}
+
+.ui-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  background: rgba(17, 22, 36, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  color: #F8FAFC;
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  transform: translateX(24px);
+  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body.light-theme .ui-toast {
+  background: rgba(255, 255, 255, 0.98);
+  color: #0F172A;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+}
+
+.ui-toast.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.ui-toast.closing {
+  opacity: 0;
+  transform: translateX(24px);
+}
+
+.ui-toast-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ui-toast-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.ui-toast-success { border-left: 3px solid var(--success); }
+.ui-toast-success .ui-toast-icon { color: var(--success); }
+
+.ui-toast-error { border-left: 3px solid var(--danger); }
+.ui-toast-error .ui-toast-icon { color: var(--danger); }
+
+.ui-toast-warning { border-left: 3px solid var(--warning); }
+.ui-toast-warning .ui-toast-icon { color: var(--warning); }
+
+.ui-toast-info { border-left: 3px solid var(--accent-cyan); }
+.ui-toast-info .ui-toast-icon { color: var(--accent-cyan); }
+
+.ui-toast-msg {
+  flex: 1;
+}
+
+.ui-toast-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.ui-toast-close:hover {
+  color: var(--text-main);
+}
+
+/* --- Modal de Confirmación Personalizado --- */
+.ui-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: rgba(5, 8, 16, 0.72);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.ui-modal-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ui-modal-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px 24px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  transform: scale(0.95);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ui-modal-overlay.open .ui-modal-card {
+  transform: scale(1);
+}
+
+.ui-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ui-modal-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.32);
+  color: var(--warning);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ui-modal-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.ui-modal-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.ui-modal-msg {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  white-space: pre-line;
+  margin-bottom: 20px;
+}
+
+.ui-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.ui-modal-ok.danger {
+  background: var(--danger);
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.35);
+}
+
+.ui-modal-ok.danger:hover {
+  background: #DC2626;
+}
+
 
 
 

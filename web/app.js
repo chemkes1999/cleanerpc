@@ -21,7 +21,11 @@ const AppState = {
   currentTreemapParent: null,
   treemapInitialized: false,
   isBusy: false,
-  logOpen: true
+  logOpen: false,
+  unreadLogs: 0,
+  hasLockedApps: false,
+  bannerDismissed: false,
+  activeTab: "tab-dashboard"
 };
 
 // Formateador de bytes a unidades legibles
@@ -97,15 +101,15 @@ function applyInitialState(state) {
   updatePresetButtons(AppState.config.min_age_hours || 24);
 
   // Comprobar aplicaciones abiertas que bloquean limpieza
-  const lockedBanner = document.getElementById("locked-apps-banner");
   if (state.locked_apps && state.locked_apps.length > 0) {
     const appsText = state.locked_apps.map(a => a.name).join(", ");
     document.getElementById("banner-apps-text").textContent = appsText;
-    lockedBanner.style.display = "flex";
+    AppState.hasLockedApps = true;
     addLog(`Aviso: Detectadas aplicaciones abiertas (${appsText}). Ciérralas para limpiar su caché.`, "warning");
   } else {
-    lockedBanner.style.display = "none";
+    AppState.hasLockedApps = false;
   }
+  updateLockedBannerVisibility();
 
   // Cargar módulos iniciales
   loadStartupPrograms();
@@ -743,17 +747,37 @@ function setBusyState(busy, statusText = "") {
   }
 }
 
-// --- Sistema de Logs ---
+// --- Banner Contextual y Sistema de Logs ---
+
+function updateLockedBannerVisibility() {
+  const lockedBanner = document.getElementById("locked-apps-banner");
+  if (!lockedBanner) return;
+  const relevantTab = AppState.activeTab === "tab-dashboard" || AppState.activeTab === "tab-cleanup";
+  lockedBanner.style.display = AppState.hasLockedApps && !AppState.bannerDismissed && relevantTab ? "flex" : "none";
+}
 
 function addLog(message, tag = "dim") {
   const terminal = document.getElementById("log-terminal");
-  const line = document.createElement("div");
-  line.className = `log-line ${tag}`;
-  line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-  terminal.appendChild(line);
+  if (terminal) {
+    const line = document.createElement("div");
+    line.className = `log-line ${tag}`;
+    line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    terminal.appendChild(line);
+    terminal.scrollTop = terminal.scrollHeight;
+  }
 
-  // Auto-scroll al final
-  terminal.scrollTop = terminal.scrollHeight;
+  if (!AppState.logOpen) {
+    AppState.unreadLogs = (AppState.unreadLogs || 0) + 1;
+    const badge = document.getElementById("log-unread-badge");
+    if (badge) {
+      badge.textContent = AppState.unreadLogs > 99 ? "99+" : String(AppState.unreadLogs);
+      badge.style.display = "inline-block";
+    }
+  }
+
+  if (typeof window.showToast === "function" && (tag === "success" || tag === "error")) {
+    window.showToast(message, tag);
+  }
 }
 
 // --- Event Listeners ---
@@ -763,12 +787,22 @@ function setupEventListeners() {
     window.initV24Modules();
   }
 
+  const dismissBannerBtn = document.getElementById("btn-dismiss-banner");
+  if (dismissBannerBtn) {
+    dismissBannerBtn.addEventListener("click", () => {
+      AppState.bannerDismissed = true;
+      updateLockedBannerVisibility();
+    });
+  }
+
   // Navegación de pestañas
   document.querySelectorAll(".nav-item").forEach(btn => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       const tabId = btn.dataset.tab;
+      AppState.activeTab = tabId;
+      updateLockedBannerVisibility();
       animateTabTransition(tabId);
 
       if (tabId === "tab-disk-map") {
@@ -897,6 +931,9 @@ function setupEventListeners() {
     if (AppState.logOpen) {
       logTerminal.style.display = "block";
       logArrow.textContent = "▲";
+      AppState.unreadLogs = 0;
+      const badge = document.getElementById("log-unread-badge");
+      if (badge) badge.style.display = "none";
     } else {
       logTerminal.style.display = "none";
       logArrow.textContent = "▼";
@@ -958,7 +995,13 @@ function setupEventListeners() {
     if (!filePath) return;
     const passes = parseInt(document.getElementById("shred-passes").value) || 1;
 
-    if (!confirm(`⚠️ ATENCIÓN: Se triturará y eliminará de forma irreversible el archivo:\n\n${filePath}\n\n¿Deseas continuar?`)) {
+    const okShred = await window.showConfirmModal({
+      title: "Trituración irreversible",
+      message: `Se sobrescribirá y eliminará permanentemente el archivo:\n\n${filePath}\n\n¿Deseas continuar?`,
+      confirmText: "Triturar archivo",
+      danger: true,
+    });
+    if (!okShred) {
       return;
     }
 
@@ -1071,7 +1114,13 @@ function setupEventListeners() {
   if (btnDeleteLeftovers) {
     btnDeleteLeftovers.addEventListener("click", async () => {
       if (!AppState.currentLeftovers || AppState.currentLeftovers.length === 0) return;
-      if (!confirm(`¿Deseas eliminar definitivamente las ${AppState.currentLeftovers.length} carpetas residuales huérfanas?`)) return;
+      const okLeftovers = await window.showConfirmModal({
+        title: "Eliminar residuos huérfanos",
+        message: `¿Deseas eliminar definitivamente las ${AppState.currentLeftovers.length} carpetas residuales detectadas?`,
+        confirmText: "Eliminar residuos",
+        danger: true,
+      });
+      if (!okLeftovers) return;
 
       addLog(`Eliminando ${AppState.currentLeftovers.length} carpetas de residuos...`, "warning");
       try {
@@ -1193,7 +1242,13 @@ function setupEventListeners() {
             `;
             const btnDel = item.querySelector("button");
             btnDel.addEventListener("click", async () => {
-              if (!confirm(`¿Eliminar definitivamente el archivo de descarga:\n\n${d.name}?`)) return;
+              const okDel = await window.showConfirmModal({
+                title: "Eliminar descarga antigua",
+                message: `¿Eliminar definitivamente el archivo:\n\n${d.name}?`,
+                confirmText: "Eliminar",
+                danger: true,
+              });
+              if (!okDel) return;
               try {
                 const delRes = await window.pywebview.api.delete_download_file(d.path);
                 if (delRes.success) {
@@ -1298,7 +1353,13 @@ function renderInstalledApps(apps) {
         return;
       }
 
-      if (!confirm(`¿Iniciar la desinstalación de '${app.name}'?`)) return;
+      const okUninstall = await window.showConfirmModal({
+        title: "Desinstalar aplicación",
+        message: `¿Deseas iniciar la desinstalación de '${app.name}'?`,
+        confirmText: "Desinstalar",
+        danger: false,
+      });
+      if (!okUninstall) return;
 
       addLog(`Iniciando desinstalador para: ${app.name}`, "info");
       try {
@@ -1641,7 +1702,13 @@ async function loadLargestFilesHunter(targetPath, minMb) {
       });
 
       tr.querySelector(".btn-shred-largest").addEventListener("click", async () => {
-        if (!confirm(`¿Estás seguro de triturar irrecuperablemente:\n\n${f.name} (${f.size_formatted})?`)) return;
+        const okLarge = await window.showConfirmModal({
+          title: "Triturar archivo gigante",
+          message: `¿Estás seguro de triturar de forma irrecuperable:\n\n${f.name} (${f.size_formatted})?`,
+          confirmText: "Triturar",
+          danger: true,
+        });
+        if (!okLarge) return;
         addLog(`Triturando archivo gigante: ${f.name}...`, "warning");
         try {
           const res = await window.pywebview.api.delete_or_shred_file(f.path, true);

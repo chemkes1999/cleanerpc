@@ -1,10 +1,17 @@
-# ⚡ PyClean Pro v2.5 - Suite Integral de Optimización, Hardware, Red y Privacidad (Windows & macOS)
+# ⚡ PyClean Pro v2.6 - Suite Integral de Optimización, Hardware, Red y Privacidad (Windows & macOS)
 
 Una aplicación profesional, moderna, rápida y segura desarrollada en Python para analizar y limpiar archivos residuales, explorar visualmente particiones y carpetas con Treemap interactivo, monitorear procesos/red/DNS en tiempo real, auditar salud S.M.A.R.T. de SSDs y desgaste de batería, gestionar el menú contextual de Windows, almacenar credenciales en una bóveda local cifrada AES-256-GCM y optimizar el rendimiento del sistema operativo.
 
 ---
 
 ## 🚀 Novedades y Características Principales
+
+### 🎨 Rediseño Integral de Interfaz (Nuevo en v2.6)
+- **Menú lateral agrupado** en 4 secciones (*General*, *Sistema y Hardware*, *Seguridad y Privacidad*, *Gestión*).
+- **Selector de Tema (Oscuro / OLED / Claro)** en la barra superior con persistencia local.
+- **Notificaciones Toast flotantes y Modales de confirmación personalizados** (reemplazando alertas nativas del sistema).
+- **Banner contextual descartable** y consola de registro colapsada por defecto con contador de eventos nuevos.
+- **Bóveda Cifrada rediseñada** con tarjeta de acceso glassmórfica, medidor de entropía en vivo, KPIs y filtros por categoría.
 
 ### 🍎 Instalador Oficial para macOS (Nuevo en v2.5)
 - **Instalador `.dmg` nativo (`PyCleanPro-macOS.dmg`):** Contiene el bundle `PyCleanPro.app` (con ícono `.icns` de alta resolución) y acceso directo a `/Applications` para arrastrar e instalar.
