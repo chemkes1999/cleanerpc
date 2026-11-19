@@ -1,217 +1,164 @@
-# ⚡ PyClean Pro v2.6 - Suite Integral de Optimización, Hardware, Red y Privacidad (Windows & macOS)
+# ⚡ PyClean Pro v2.6.0
 
-Una aplicación profesional, moderna, rápida y segura desarrollada en Python para analizar y limpiar archivos residuales, explorar visualmente particiones y carpetas con Treemap interactivo, monitorear procesos/red/DNS en tiempo real, auditar salud S.M.A.R.T. de SSDs y desgaste de batería, gestionar el menú contextual de Windows, almacenar credenciales en una bóveda local cifrada AES-256-GCM y optimizar el rendimiento del sistema operativo.
+**Suite integral de escritorio para limpieza segura, análisis visual de disco, monitoreo de procesos y red, diagnóstico de hardware, privacidad y bóveda local de contraseñas cifrada (Windows y macOS).**
 
----
-
-## 🚀 Novedades y Características Principales
-
-### 🎨 Rediseño Integral de Interfaz (Nuevo en v2.6)
-- **Menú lateral agrupado** en 4 secciones (*General*, *Sistema y Hardware*, *Seguridad y Privacidad*, *Gestión*).
-- **Selector de Tema (Oscuro / OLED / Claro)** en la barra superior con persistencia local.
-- **Notificaciones Toast flotantes y Modales de confirmación personalizados** (reemplazando alertas nativas del sistema).
-- **Banner contextual descartable** y consola de registro colapsada por defecto con contador de eventos nuevos.
-- **Bóveda Cifrada rediseñada** con tarjeta de acceso glassmórfica, medidor de entropía en vivo, KPIs y filtros por categoría.
-
-### 🍎 Instalador Oficial para macOS (Nuevo en v2.5)
-- **Instalador `.dmg` nativo (`PyCleanPro-macOS.dmg`):** Contiene el bundle `PyCleanPro.app` (con ícono `.icns` de alta resolución) y acceso directo a `/Applications` para arrastrar e instalar.
-- **Soporte nativo macOS:** Categorías de limpieza para `~/Library/Caches`, `~/Library/Logs`, `~/.Trash`, navegadores, VS Code, Pip/NPM/Cargo/Homebrew y `Xcode DerivedData`, estadísticas de RAM con `psutil` y copia segura al portapapeles con `pbcopy`.
-- **Compilación local en Mac:** Ejecuta `python3 build_macos.py` en macOS para generar `dist/PyCleanPro.app` y `dist/PyCleanPro-macOS.dmg`.
-- **Nota sobre Gatekeeper (apps sin notarización de Apple):** Al abrir `PyCleanPro.app` por primera vez, haz **clic derecho → Abrir** y confirma "Abrir".
-
-### 0. 🔥 Suite Avanzada (v2.4)
-- **📊 Monitor de Procesos y Red (`sys_monitor.py`):** Top procesos por RAM/CPU con protección de procesos críticos de Windows, selector rápido de DNS (Cloudflare, Google, AdGuard, DHCP) y prueba de latencia (ping).
-- **🩺 Salud de Hardware (`hardware_health.py`):** Estado S.M.A.R.T. de discos físicos (SSD/HDD/NVMe), botón de optimización **TRIM** nativo y análisis de desgaste/ciclos de batería en portátiles.
-- **🖱️ Gestor del Menú Contextual (`context_menu.py`):** Lista y permite ocultar/reactivar entradas del clic derecho del Explorador de Windows de forma 100% reversible (`LegacyDisable`).
-- **🔐 Bóveda Local de Contraseñas (`vault.py`):** Cifrado autenticado **AES-256-GCM** + **PBKDF2-HMAC-SHA256** (600,000 iteraciones), generador criptográfico, medidor de entropía, auto-bloqueo y limpieza automática del portapapeles en 30 segundos.
+Construida en **Python 3.10+** con una interfaz moderna 100% offline impulsada por **PyWebView + HTML/CSS/JS + GSAP 3.12.5**, respaldo automático en **Tkinter** (`--legacy-gui`) y una **CLI completa con 24 banderas** para automatización.
 
 ---
 
-### 1. 🗺️ Mapa de Almacenamiento, Particiones y Treemap (Nuevo en v2.3)
-- **Vista de Particiones y Unidades de Disco:**
-  - Detecta todas las unidades (`C:\`, `D:\`, discos externos, USBs) mostrando nombre de volumen, sistema de archivos (`NTFS`, `FAT32`, etc.), espacio libre/total y medidor de uso visual.
-- **Explorador Visual de Carpetas y Treemap:**
-  - Bloques proporcionales de color estilo *WinDirStat / WizTree* que representan visualmente el peso de cada subcarpeta o archivo.
-  - Navegación interactiva con migas de pan (*breadcrumbs*) y botón "Subir Nivel".
-  - Clasificación de almacenamiento por tipos de archivos: **Videos**, **Comprimidos e ISOs**, **Ejecutables**, **Documentos** e **Imágenes**.
-- **🐘 Cazador de Archivos Gigantes:**
-  - Localiza al instante los archivos más pesados del disco (> 100 MB, > 500 MB, > 1 GB o > 2 GB) con filtros rápidos.
-  - Acciones directas: **Abrir en Explorador de Windows**, **Triturar de forma segura** o **Eliminar**.
+## 📚 Índice de Documentación
+
+| Documento | Descripción |
+|---|---|
+| **[Guía de Usuario](docs/GUIA_USUARIO.md)** | Recorrido por las 13 vistas (4 grupos), temas Oscuro/OLED/Claro, categorías de limpieza (20 Windows / 9 macOS) e interfaz clásica `--legacy-gui`. |
+| **[Referencia CLI](docs/CLI.md)** | Referencia exhaustiva de las 24 banderas de `main.py`, compatibilidad con `--json`/`--export` y recetas de automatización. |
+| **[Seguridad y Bóveda](docs/SEGURIDAD_Y_BOVEDA.md)** | Especificación criptográfica de `vault.py` (AES-256-GCM + PBKDF2-HMAC-SHA256 600k), salvaguardas de limpieza y modelo de amenazas. |
+| **[Arquitectura y Puente API](docs/ARQUITECTURA.md)** | Diagrama Mermaid de capas, 5 motores backend, frontend offline, referencia de los 56 métodos de `PyCleanAPI`, rutas por SO y suite de 21 tests. |
+| **[Compilación y Releases](docs/COMPILACION_Y_RELEASE.md)** | Compilación local Windows (`.exe`/Setup) y macOS (`.app`/`.dmg`), pipeline GitHub Actions, firma Authenticode y verificación `SHA256SUMS.txt`. |
+| **[Historial de Cambios](CHANGELOG.md)** | Registro cronológico de versiones desde `v2.0.0` hasta `v2.6.0`. |
 
 ---
 
-### 2. 📦 Instalador Oficial para Windows (Nuevo en v2.3)
-- **Instalador Completo (`PyCleanPro-Setup.exe`):**
-  - Script oficial Inno Setup 6 ([`installer.iss`](file:///installer.iss)) para generar un instalador con asistente moderno en español e inglés.
-  - Crea accesos directos en el **Menú Inicio** y opcionalmente en el **Escritorio**.
-  - Registra el programa limpiamente en la configuración de Windows y Panel de Control ("Agregar o quitar programas").
-  - Compilación automática con [`build_installer.py`](file:///build_installer.py) o mediante el menú de [`build.bat`](file:///build.bat).
-  - Integrado en el flujo de CI/CD de GitHub Actions para publicar tanto el ejecutable portable como el instalador Setup en cada release.
+## 🖥️ Matriz de Compatibilidad por Plataforma
+
+| Módulo / Funcionalidad | Windows 10/11 | macOS | Linux (desde fuente) |
+|---|:---:|:---:|:---:|
+| **Instalador / Binario oficial en Releases** | ✅ `.exe` portable y `Setup.exe` | ✅ `.dmg` (`PyCleanPro.app`) | ⚙️ Solo código fuente |
+| **Limpieza inteligente por categorías** | ✅ 20 categorías (15 usuario / 5 Admin) | ✅ 9 categorías nativas | ⚠️ Parcial (solo rutas comunes) |
+| **Mapa de Disco, Treemap y Archivos Gigantes** | ✅ Completo | ✅ Completo | ✅ Completo |
+| **Monitor de Procesos, Interfaces IPv4 y Ping** | ✅ Completo | ✅ Completo | ✅ Completo |
+| **Selector rápido de DNS y Vaciar DNS** | ✅ (`netsh` / `ipconfig`, Admin) | ❌ Solo Windows | ❌ Solo Windows |
+| **Salud de Hardware (S.M.A.R.T., TRIM, Batería)** | ✅ Completo (TRIM requiere Admin) | ⚠️ Solo carga básica de batería | ⚠️ Solo carga básica de batería |
+| **Bóveda Local de Contraseñas (AES-256-GCM)** | ✅ Completo (`clip` 30 s) | ✅ Completo (`pbcopy` 30 s) | ⚠️ Sin auto-copiado al portapapeles |
+| **Triturador Seguro, Duplicados SHA-256 y Descargas** | ✅ Completo | ✅ Completo | ✅ Completo |
+| **Desinstalador + Residuos, Inicio Rápido y Telemetría** | ✅ Completo (Admin para HKLM/servicios) | ❌ Solo Windows | ❌ Solo Windows |
+| **Gestor del Menú Contextual (Clic Derecho)** | ✅ Reversible (`LegacyDisable`) | ❌ Solo Windows | ❌ Solo Windows |
+| **Programador de Tareas (`PyCleanPro_AutoClean`)** | ✅ (`schtasks`, Admin) | ❌ Solo Windows | ❌ Solo Windows |
 
 ---
 
-### 3. Limpieza Inteligente y Segura (20 Categorías)
-- **Filtro de Antigüedad por Seguridad (Retention Filter):** Protege archivos temporales modificados recientemente (< 24 horas por defecto) para no dañar instaladores en ejecución o descargas activas.
-- **Protección contra Directory Junctions (Puntos de Montaje):** Previene atravesar o eliminar carpetas vinculadas que apunten a documentos personales o discos externos.
-- **Detección de Procesos en Ejecución:** Avisa en tiempo real si Chrome, Edge, Firefox, Spotify o Discord están abiertos para evitar bloqueos y corrupción de datos de caché.
-- **Lista Blanca de Exclusiones (Whitelist):** Permite configurar carpetas o rutas que **nunca** se eliminarán ni modificarán.
-- **Temporales de Usuario y del Sistema:** Limpieza de `%TEMP%`, `C:\Windows\Temp` y `Prefetch`.
-- **Papelera de Reciclaje:** Vaciado silencioso mediante la API Win32 (`SHEmptyRecycleBinW`).
-- **Navegadores Web (Soporte Multi-Perfil):**
-  - **Google Chrome, Microsoft Edge, Brave, Mozilla Firefox, Opera / Opera GX y Vivaldi.**
-  - Escanea automáticamente todos los perfiles (`Default`, `Profile 1`, `Profile 2`, etc.).
-  - *Nunca toca contraseñas, historial, marcadores ni sesiones abiertas.*
-- **Herramientas de Desarrollo y Apps:**
-  - Caché de **Visual Studio Code** (`Cache`, `CachedData`, extensiones VSIX temporales).
-  - Paquetes descargados de **Pip (Python)**, **NPM / PNPM / Yarn (Node.js)** y **Cargo (Rust)**.
-  - Caché multimedia de **Discord** y almacenamiento local de **Spotify**.
-- **Windows System Extra:**
-  - Caché de **Windows Update** (`SoftwareDistribution\Download`).
-  - Archivos de **Optimización de Distribución** (`DeliveryOptimization`).
-  - Archivos de registro y logs antiguos de Windows (`C:\Windows\Logs` y `Panther`).
-  - Reportes de caídas y volcados de error (`CrashDumps` y WER).
-  - Miniaturas del explorador (`thumbcache` e `iconcache`) y componentes web (`INetCache`).
+## ✨ Resumen de Módulos (Interfaz v2.6.0)
+
+La interfaz moderna organiza sus **13 vistas** en **4 grupos** de la barra lateral, con selector de tema (**Oscuro / OLED / Claro**), barra superior de acciones rápidas y consola de registro en vivo colapsable:
+
+### 1. General
+- **Dashboard:** Medidores circulares SVG animados (GSAP) de disco y RAM, contador animado de espacio recuperable y desglose por categoría.
+- **Limpieza:** 20 categorías en Windows y 9 nativas en macOS con filtro de retención de 24 horas, protección contra enlaces simbólicos/*junctions*, lista blanca de exclusiones y aviso contextual de navegadores abiertos.
+- **Archivos Top:** Listado de los 100 archivos basura más pesados detectados en el último escaneo con acceso directo al explorador de archivos.
+
+### 2. Sistema y Hardware
+- **Mapa de Disco:** Tarjetas de particiones con sistema de archivos y uso, **Treemap visual interactivo** con clasificación por tipo de archivo y **Cazador de Archivos Gigantes** (>100 MB a >2 GB).
+- **Monitor y Red (`sys_monitor.py`):** Top 35 procesos por RAM/CPU con protección de 18 procesos críticos del sistema, adaptadores IPv4, presets DNS en 1 clic (Cloudflare, Google, AdGuard, DHCP) y test de latencia Ping.
+- **Salud Hardware (`hardware_health.py`):** Diagnóstico S.M.A.R.T. de discos físicos, optimización **SSD TRIM** (`Optimize-Volume -ReTrim`) y salud/desgaste/ciclos de batería.
+- **Inicio Rápido:** Activación y desactivación reversible de programas de inicio de Windows (`Run` ↔ `RunDisabled`).
+
+### 3. Seguridad y Privacidad
+- **Bóveda (`vault.py`):** Gestor local de contraseñas *Zero-Knowledge* 100% offline con **PBKDF2-HMAC-SHA256** (600,000 iteraciones) + **AES-256-GCM**, generador CSPRNG, medidor de entropía, auto-bloqueo tras 5 minutos, limpieza del portapapeles a los 30 segundos y respaldos cifrados `.vault`.
+- **Privacidad:** Auditoría y mitigación reversible de servicios de telemetría de Windows (`DiagTrack`, `dmwappushservice`, `WerSvc`) y directiva `AllowTelemetry`.
+- **Herramientas:** Triturador seguro de archivos (1 o 3 pasadas), buscador de duplicados por hash SHA-256 y auditor de descargas antiguas (>30/60/90 días).
+
+### 4. Gestión
+- **Desinstalador:** Catálogo de aplicaciones instaladas desde el Registro de Windows con detección y limpieza opcional de carpetas residuales huérfanas.
+- **Menú Contextual (`context_menu.py`):** Auditoría y ocultación/reactivación 100% reversible de entradas de terceros en el menú clic derecho del Explorador de Windows (`LegacyDisable`). *(No instala accesos de PyClean en el menú contextual).*
+- **Ajustes:** Configuración de antigüedad mínima de archivos, exclusiones y Programador de Tareas de Windows (`PyCleanPro_AutoClean`).
 
 ---
 
-### 4. Desinstalador Limpio y Mantenimiento Avanzado
-- **📦 Desinstalador Limpio de Aplicaciones con Escáner de Residuos:**
-  - Cataloga todas las aplicaciones instaladas en Windows desde el Registro (`HKLM`, `HKCU` y `Wow6432Node`).
-  - Permite buscar en tiempo real, visualizar tamaño estimado y ejecutar desinstalaciones nativas.
-  - **Detección de Residuos Huérfanos:** Tras desinstalar, rastrea carpetas huérfanas en `%APPDATA%`, `%LOCALAPPDATA%` y `%PROGRAMDATA%` para eliminarlas de forma definitiva.
-- **⏰ Programador de Mantenimiento Automático (Task Scheduler):**
-  - Configura una tarea programada nativa en Windows (`schtasks`) para ejecutar la optimización silenciosa periódica (semanal o diaria) sin intervención del usuario.
-- **🛡️ Optimizador de Telemetría y Privacidad:**
-  - Audita y permite pausar o desactivar servicios de recolección diagnóstica (`DiagTrack`, `dmwappushservice`, `WerSvc`) y configurar la directiva `DataCollection` en el Registro.
-- **📂 Auditor de Descargas Pesadas y Antiguas:**
-  - Identifica instaladores (`.iso`, `.exe`, `.msi`, `.zip`) en la carpeta `Descargas` con más de 30, 60 o 90 días sin abrir para recuperar gigabytes rápidamente.
+## 📦 Instalación Rápida
 
----
+### Opción A: Descargar Binarios Oficiales (Recomendado)
 
-### 5. Dashboard Gráfico Interactivo y Moderno (Animaciones GSAP + PyWebView)
-- **Interfaz Moderna con GSAP (GreenSock Animation Platform):**
-  - Gráficos SVG circulares animados con easing dinámico para Disco y Memoria RAM.
-  - Contadores de bytes y archivos animados en tiempo real (`0 B` -> `XX.XX GB`).
-  - Banner dinámico de advertencia cuando hay navegadores en ejecución.
-  - Pestañas de **Mapa de Disco**, **Desinstalador**, **Privacidad**, **Herramientas Avanzadas** (Triturador y Duplicados) y **Ajustes**.
-  - Botón de **Exportación de Informes** de diagnóstico a formatos `.json` o `.txt`.
-  - Consola de logs integrada y colapsable con auto-scroll y etiquetas cromáticas.
-- **Soporte Multi-Disco:** Selector dinámico de unidades (`C:\`, `D:\`, etc.) con estadísticas en gigabytes y porcentaje en tiempo real.
-- **Compatibilidad Dual:** Incluye tanto la interfaz moderna con GSAP como la interfaz gráfica clásica en Tkinter (`--legacy-gui`).
+Descarga los instaladores precompilados desde la sección **[GitHub Releases](https://github.com/chemkes1999/cleanerpc/releases)**:
 
----
+- **Windows (Instalador):** `PyCleanPro-Setup.exe` — Asistente Inno Setup 6 en español e inglés con accesos directos y registro en Panel de Control.
+- **Windows (Portable):** `PyCleanPro.exe` — Ejecutable independiente sin instalación.
+- **macOS:** `PyCleanPro-macOS.dmg` — Abre el `.dmg` y arrastra `PyCleanPro.app` a la carpeta **Aplicaciones**.
+  > **Nota sobre macOS Gatekeeper:** Si la aplicación no cuenta con notarización de Apple, al abrirla por primera vez haz **clic derecho → Abrir** y confirma **Abrir**.
+  > **Nota sobre Windows SmartScreen:** Si el binario no está firmado con certificado Authenticode, haz clic en **Más información → Ejecutar de todas formas**.
 
-### 6. Herramientas Avanzadas de Rendimiento y Seguridad
-- **🗑️ Triturador Seguro de Archivos (File Shredder):**
-  - Sobrescribe el contenido de archivos confidenciales con bytes aleatorios (`os.urandom`) y ceros antes de desenlazarlos del sistema de archivos, impidiendo su recuperación forense (soporta 1 pasada rápida o 3 pasadas estándar DoD 5220.22-M).
-- **🔍 Buscador de Archivos Duplicados (Duplicate Finder):**
-  - Identifica archivos duplicados agrupando por tamaño y calculando firmas criptográficas SHA-256 por bloques para liberar espacio desperdiciado.
-- **🚀 Gestor de Programas de Inicio de Windows:**
-  - Lee y cataloga los programas que arrancan automáticamente con el equipo desde el Registro (`HKCU` y `HKLM`).
-  - Permite habilitar o deshabilitar cualquier programa de inicio de forma segura (moviéndolo a `RunDisabled` sin borrar entradas críticas).
-- **⚡ Compactación de Memoria RAM:**
-  - Vaciado del working set (`EmptyWorkingSet`) de los procesos del usuario para liberar RAM a Standby/Disponible.
-- **🌐 Vaciado de Caché DNS:**
-  - Ejecución de `ipconfig /flushdns` para resolver fallos de navegación y caché de red.
+#### Verificar integridad con `SHA256SUMS.txt`
 
----
+```powershell
+# Windows (PowerShell)
+Get-FileHash .\PyCleanPro-Setup.exe -Algorithm SHA256
+```
 
-### 7. Estabilidad, Testing y CI/CD Automático
-- **Cero bloqueos en desarrollo:** Compatibilidad multiplataforma y stubs para `winreg`/`ctypes` que permiten ejecutar tests y desarrollo en cualquier sistema operativo.
-- **Suite de Pruebas Automatizadas:** 13 tests unitarios en `tests/` que validan seguridad, cálculo de antigüedad, triturador, duplicados, auditoría de descargas, mapa de disco, treemap y fallbacks.
-- **Compilador a Ejecutable Portable e Instalador Setup:** Scripts incluidos con PyInstaller e Inno Setup (`build_exe.py`, `build_installer.py`, `build.bat`) para compilar binarios sin necesidad de Python instalado.
-- **GitHub Actions CI/CD ([`.github/workflows/build-release.yml`](file:///.github/workflows/build-release.yml)):** Flujo automático en `windows-latest` que compila tanto `PyCleanPro.exe` como `PyCleanPro-Setup.exe` y los adjunta como assets descargables en los Releases de GitHub al crear tags `v*`.
-
----
-
-## 🖥️ Cómo Ejecutar
-
-### Opción 1: Interfaz Gráfica (Recomendado)
-Haz doble clic en:
-- **`run.bat`**: Inicia la interfaz gráfica estándar moderna en modo oscuro.
-- **`run_admin.bat`**: Inicia la interfaz con privilegios de Administrador para limpiar carpetas protegidas del sistema (`Windows\Temp`, `SoftwareDistribution`, `Logs` y `Prefetch`).
-
-O desde la terminal:
 ```bash
-python main.py
+# macOS / Linux
+shasum -a 256 PyCleanPro-macOS.dmg
+```
+
+Compara el hash obtenido con el publicado en el archivo `SHA256SUMS.txt` del mismo release.
+
+---
+
+### Opción B: Ejecutar desde Código Fuente
+
+Requiere **Python 3.10 o superior** (se recomienda **Python 3.11**).
+
+```bash
+git clone https://github.com/chemkes1999/cleanerpc.git
+cd cleanerpc
+pip install -r requirements.txt
+```
+
+Para desarrollo, pruebas y compilación local:
+
+```bash
+pip install -r requirements-dev.txt
 ```
 
 ---
 
-### Opción 2: Modo Consola (CLI / Automatización)
-Ideal para scripts, tareas programadas en Windows o entornos DevOps:
+## 🚀 Inicio Rápido (GUI y CLI)
+
+### Interfaz Gráfica
 
 ```bash
-# Escanear el sistema y ver espacio recuperable:
+# Abrir interfaz moderna (PyWebView + GSAP, con respaldo automático a Tkinter)
+python main.py
+
+# En macOS / Linux
+python3 main.py
+
+# Forzar interfaz clásica en Tkinter (subconjunto de funciones v2.0)
+python main.py --legacy-gui
+```
+
+En Windows también puedes usar los lanzadores incluidos: [`run.bat`](run.bat) (usuario estándar) o [`run_admin.bat`](run_admin.bat) (con elevación UAC para limpiar caché de Windows Update, Prefetch, TRIM o telemetría).
+
+### Línea de Comandos (Ejemplos Frecuentes)
+
+```bash
+# Escanear espacio recuperable sin borrar archivos
 python main.py --scan
 
-# Simular limpieza (Dry-Run):
-python main.py --dry-run
+# Simular limpieza en una unidad específica
+python main.py --dry-run --drive D:\
 
-# Limpiar archivos basura respetando reglas de seguridad:
-python main.py --clean
-
-# Listar aplicaciones instaladas en el sistema:
-python main.py --apps
-
-# Auditar instaladores antiguos en Descargas (> 30 días):
-python main.py --downloads-audit 30
-
-# Activar tarea semanal de mantenimiento automático:
-python main.py --schedule on
-
-# Mitigar servicios de telemetría y diagnósticos de Windows:
-python main.py --privacy on
-
-# Triturar y destruir un archivo confidencial de forma irrecuperable:
-python main.py --shred C:\Ruta\archivo_secreto.docx --shred-passes 3
-
-# Buscar archivos duplicados en una carpeta:
-python main.py --duplicates C:\Users\TuUsuario\Downloads
-
-# Exportar reporte de escaneo a archivo de texto:
-python main.py --scan --export C:\Users\TuUsuario\Desktop\reporte.txt
-
-# Listar programas configurados para iniciar con Windows:
-python main.py --startup
-
-# Especificar otra unidad de disco (ej. D:\):
-python main.py --scan --drive D:\
-
-# Generar un reporte estructurado en formato JSON:
-python main.py --scan --json
-
-# Optimizar memoria RAM:
-python main.py --ram
-
-# Vaciar la caché DNS:
-python main.py --dns
-
-# Ejecutar optimización completa (RAM + DNS + Limpieza):
+# Optimizar RAM, vaciar DNS y limpiar todas las categorías
 python main.py --all
+
+# Diagnóstico de hardware (S.M.A.R.T. y batería) en formato JSON
+python main.py --hardware --json
+
+# Exportar reporte de escaneo a JSON o texto plano
+python main.py --scan --export reporte.json
+
+# Buscar duplicados por contenido SHA-256
+python main.py --duplicates "C:\Users\Usuario\Documentos"
 ```
 
----
-
-## 📦 Compilación a .exe (Ejecutable Portable)
-
-Para empaquetar la aplicación en un único archivo ejecutable `.exe` que no requiera Python:
-
-1. Instala las dependencias:
-   ```bash
-   pip install -r requirements-dev.txt
-   ```
-2. Ejecuta el compilador o haz doble clic en `build.bat`:
-   ```bash
-   python build_exe.py
-   ```
-3. El ejecutable portable se generará en la carpeta `dist/PyCleanPro.exe`.
+Consulta las **24 banderas disponibles** y sus reglas de combinación en la **[Referencia CLI completa](docs/CLI.md)**.
 
 ---
 
-## 🧪 Ejecutar Tests
+## 🧪 Pruebas Unitarias
 
-Para ejecutar la suite de pruebas unitarias:
+El proyecto incluye una suite de **21 pruebas unitarias** distribuidas en 2 archivos:
+- [`tests/test_cleaner.py`](tests/test_cleaner.py) — **13 pruebas** (limpieza, filtro de retención, triturador, duplicados, reportes, descargas, residuos, particiones, treemap, archivos gigantes y salvaguardas).
+- [`tests/test_v24_modules.py`](tests/test_v24_modules.py) — **8 pruebas** (procesos críticos, validación DNS, XML de batería, validación TRIM, menú contextual, ciclo de vida de la bóveda, fortaleza de contraseñas y categorías macOS).
+
 ```bash
 pytest tests/ -v
 ```
@@ -220,13 +167,49 @@ pytest tests/ -v
 
 ## 📁 Estructura del Proyecto
 
-- [`cleaner.py`](file:///home/antigravity/chemkes1999/cleanerpc/cleaner.py): Motor central de análisis, limpieza segura, llamadas Win32 API, filtro de antigüedad, protección de junctions, triturador seguro, detector de duplicados, desinstalador, auditor de descargas y telemetría.
-- [`main.py`](file:///home/antigravity/chemkes1999/cleanerpc/main.py): Punto de entrada con soporte completo para GUI y CLI (incluyendo `--apps`, `--downloads-audit`, `--schedule`, `--privacy`, `--shred`, etc.).
-- [`web_gui.py`](file:///home/antigravity/chemkes1999/cleanerpc/web_gui.py): API PyWebView que conecta el frontend con el motor Python.
-- [`web/`](file:///home/antigravity/chemkes1999/cleanerpc/web): Interfaz moderna (HTML, CSS y JS con animaciones fluidas GSAP).
-- [`tests/`](file:///home/antigravity/chemkes1999/cleanerpc/tests): Suite de 10 pruebas unitarias automatizadas (`test_cleaner.py`).
-- [`.github/workflows/build-release.yml`](file:///home/antigravity/chemkes1999/cleanerpc/.github/workflows/build-release.yml): Pipeline de CI/CD para compilación de `.exe` y releases en GitHub.
-- [`build_exe.py`](file:///home/antigravity/chemkes1999/cleanerpc/build_exe.py) / [`build.bat`](file:///home/antigravity/chemkes1999/cleanerpc/build.bat): Compilador a binario `.exe` único vía PyInstaller.
-- [`gui.py`](file:///home/antigravity/chemkes1999/cleanerpc/gui.py) / [`charts.py`](file:///home/antigravity/chemkes1999/cleanerpc/charts.py): Interfaz clásica basada en Tkinter (`--legacy-gui`).
-- [`requirements.txt`](file:///home/antigravity/chemkes1999/cleanerpc/requirements.txt): Dependencias de producción.
-- [`requirements-dev.txt`](file:///home/antigravity/chemkes1999/cleanerpc/requirements-dev.txt): Dependencias de desarrollo y testing.
+```text
+cleanerpc/
+├── main.py                              # Punto de entrada unificado (GUI moderna, --legacy-gui y CLI con 24 banderas)
+├── web_gui.py                           # Host PyWebView y puente API JS↔Python (PyCleanAPI: 56 métodos públicos)
+├── gui.py                               # Interfaz clásica de respaldo en Tkinter (4 pestañas)
+├── charts.py                            # Gráficos Canvas para la interfaz Tkinter (DonutChart, HorizontalBarBreakdown)
+├── cleaner.py                           # Motor principal de limpieza (20 Windows / 9 macOS), disco, apps y herramientas
+├── sys_monitor.py                       # Monitor de procesos (18 críticos protegidos), red IPv4, DNS y Ping
+├── hardware_health.py                   # Diagnóstico S.M.A.R.T., SSD TRIM y salud/desgaste de batería
+├── context_menu.py                      # Auditor y gestor reversible del menú contextual de Windows (LegacyDisable)
+├── vault.py                             # Bóveda local cifrada Zero-Knowledge (AES-256-GCM + PBKDF2-HMAC-SHA256 600k)
+├── web/                                 # Frontend SPA 100% offline (cero CDNs)
+│   ├── index.html                       # Estructura de 13 vistas, barra lateral agrupada, consola y modales
+│   ├── style.css                        # Estilos y 3 temas visuales (Oscuro, OLED, Claro)
+│   ├── app.js                           # Controlador principal, animaciones GSAP y modo mock de navegador
+│   ├── modules_v24.js                   # Controladores UI para Monitor/Red, Hardware, Menú Contextual y Bóveda
+│   ├── ui_kit.js                        # Gestor de temas, notificaciones Toast y modal de confirmación
+│   └── gsap.min.js                      # Librería GSAP 3.12.5 empaquetada localmente
+├── tests/                               # Suite de 21 pruebas unitarias (pytest)
+│   ├── test_cleaner.py                  # 13 pruebas del motor principal y análisis de disco
+│   └── test_v24_modules.py              # 8 pruebas de módulos v2.4–v2.5 y bóveda
+├── assets/                              # Íconos multiplataforma (.ico, .icns, .png)
+├── docs/                                # Documentación técnica y guías de usuario en español
+│   ├── GUIA_USUARIO.md                  # Guía completa de la interfaz y módulos
+│   ├── CLI.md                           # Referencia de las 24 banderas de línea de comandos
+│   ├── SEGURIDAD_Y_BOVEDA.md            # Criptografía de la bóveda, salvaguardas y modelo de amenazas
+│   ├── ARQUITECTURA.md                  # Arquitectura, puente PyCleanAPI (56 métodos) y rutas por SO
+│   └── COMPILACION_Y_RELEASE.md         # Empaquetado Windows/macOS, GitHub Actions y verificación SHA-256
+├── .github/workflows/build-release.yml  # Pipeline CI/CD multi-OS (Windows, macOS y GitHub Release)
+├── build_exe.py                         # Compilación ejecutable portable Windows (PyInstaller)
+├── build_installer.py                   # Compilación instalador Windows (Inno Setup 6)
+├── build_macos.py                       # Compilación bundle .app e imagen .dmg en macOS
+├── installer.iss                        # Script Inno Setup 6 para PyCleanPro-Setup.exe
+├── version_info.txt                     # Metadatos PE de versión para Windows (2.6.0.0)
+├── build.bat / run.bat / run_admin.bat  # Scripts auxiliares de compilación y lanzamiento en Windows
+├── requirements.txt                     # Dependencias de ejecución (pywebview, psutil, cryptography)
+├── requirements-dev.txt                 # Dependencias de desarrollo y empaquetado (pytest, pyinstaller)
+├── CHANGELOG.md                         # Historial de versiones (v2.0.0 – v2.6.0)
+└── README.md                            # Documentación principal del proyecto
+```
+
+---
+
+## 📄 Licencia
+
+Actualmente este repositorio **no incluye un archivo `LICENSE` publicado**. Antes de redistribuir o incorporar el código en proyectos de terceros, consulta con el autor del repositorio (`chemkes1999`) para confirmar los términos de licencia aplicables.
