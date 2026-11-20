@@ -4,6 +4,26 @@ Todos los cambios notables en **PyClean Pro** se documentan en este archivo.
 
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto utiliza [Versionado Semántico](https://semver.org/lang/es/).
 
+## [2.7.0] - 2026-11-20
+
+### Añadido
+- **Bóveda con QR individual para celular:**
+  - Botón "📱 QR" en cada fila de credencial para proyectar en pantalla un código QR generado localmente en `<canvas>` (sin conexión externa ni CDNs).
+  - Soporte de doble modalidad: texto directo o protegido con PIN efímero de 6 dígitos cifrado mediante AES-256-GCM.
+  - Temporizador de seguridad con cuenta regresiva de 60 segundos y autodestrucción/cierre para prevenir *shoulder surfing*.
+- **Sincronización Total LAN (Wi-Fi Local):**
+  - Servidor local efímero y seguro multihilo (`VaultSyncServer` en `web_gui.py`) con detección automática de IP y tokens de emparejamiento con tiempo de vida limitado.
+  - Asistente modal en el encabezado de la bóveda ("📱 Sincronizar Móvil") con código QR de emparejamiento y monitoreo en vivo de la conexión.
+  - Algoritmo de fusión bidireccional inteligente de credenciales (*Smart Merge*) que resuelve conflictos mediante marcas de tiempo (`updated_at`) sin pérdida de datos.
+- **Aplicación Móvil Compañera (PWA & Offline Bundle):**
+  - Progressive Web App responsive táctil en `web/mobile/` y versión autocontenida de archivo único en `vault_mobile.html`.
+  - Escáner de cámara integrado en vivo (`scanner.js`, `jsqr.min.js`) para apuntar directamente a la pantalla de la PC.
+  - Motor criptográfico WebCrypto API (`crypto.js`) con compatibilidad bit a bit exacta con Python `vault.py` (PBKDF2-HMAC-SHA256 con 600.000 iteraciones y AES-256-GCM).
+  - Almacén local cifrado en el dispositivo (`storage.js`) con auto-bloqueo tras 5 minutos de inactividad.
+
+### Cambiado
+- Actualizados metadatos de versión a `2.7.0` en `installer.iss`, `version_info.txt` y `web/index.html`.
+
 ---
 
 ## [2.6.0] - 2026-11-19

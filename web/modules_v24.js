@@ -509,6 +509,7 @@ function renderVaultEntries(entries) {
       <td><span class="badge badge-primary">${v24Escape(entry.category || "General")}</span></td>
       <td style="text-align: right; white-space: nowrap;">
         <button class="btn-tool btn-vault-copy" style="padding:5px 10px; font-size:11.5px; margin-right:5px;">📋 Copiar Clave</button>
+        <button class="btn-tool btn-vault-qr" style="padding:5px 10px; font-size:11.5px; margin-right:5px;">📱 QR</button>
         <button class="btn-tool btn-vault-edit" style="padding:5px 10px; font-size:11.5px; margin-right:5px;">✏️ Editar</button>
         <button class="btn-tool btn-vault-del vault-btn-del" style="padding:5px 9px; font-size:11.5px;">🗑️</button>
       </td>
@@ -526,6 +527,13 @@ function renderVaultEntries(entries) {
         v24Log(`Error copiando contraseña: ${e}`, "error");
       }
     });
+
+    const qrBtn = tr.querySelector(".btn-vault-qr");
+    if (qrBtn) {
+      qrBtn.addEventListener("click", () => {
+        openVaultQrModal(entry.id);
+      });
+    }
 
     tr.querySelector(".btn-vault-edit").addEventListener("click", () => {
       document.getElementById("vault-entry-id").value = entry.id;
@@ -595,6 +603,243 @@ function clearVaultForm() {
   const title = document.getElementById("vault-form-title");
   if (title) title.textContent = "Agregar Credencial";
   updatePasswordStrengthUI("");
+}
+
+// =========================================================================
+// GESTIÓN DE MODALES QR Y SINCRONIZACIÓN MÓVIL (Milestone 2)
+// =========================================================================
+
+let vaultCurrentQrEntryId = null;
+let vaultQrCountdownTimer = null;
+let vaultCurrentQrPayload = "";
+let vaultSyncInterval = null;
+
+async function openVaultQrModal(entryId, usePin = false) {
+  const modal = document.getElementById("vault-qr-modal");
+  const container = document.getElementById("vault-qr-canvas-container");
+  const timerEl = document.getElementById("vault-qr-timer");
+  const titleEl = document.getElementById("vault-qr-service-title");
+  const userEl = document.getElementById("vault-qr-username");
+  const pinToggle = document.getElementById("vault-qr-pin-toggle");
+  const pinContainer = document.getElementById("vault-qr-pin-container");
+  const pinBadge = document.getElementById("vault-qr-pin-badge");
+
+  if (!modal || !container) return;
+
+  vaultCurrentQrEntryId = entryId;
+
+  // Buscar información de la credencial en caché para poblar la cabecera
+  const vaultList = (typeof V24State !== "undefined" && V24State.vaultEntries) || (typeof window !== "undefined" && window.V24State && window.V24State.vaultEntries) || [];
+  const entry = vaultList.find(e => e.id === entryId);
+  if (titleEl) titleEl.textContent = entry ? (entry.title || "Credencial") : "Credencial";
+  if (userEl) userEl.textContent = (entry && entry.username) ? entry.username : "—";
+  if (pinToggle) pinToggle.checked = Boolean(usePin);
+
+  try {
+    let res = null;
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.vault_get_qr_payload) {
+      res = await window.pywebview.api.vault_get_qr_payload(entryId, Boolean(usePin));
+    } else {
+      // Fallback seguro para entorno de navegador o pruebas sin pywebview
+      res = {
+        status: "ok",
+        payload: JSON.stringify({
+          t: usePin ? "pyclean-cred-enc" : "pyclean-cred",
+          v: 1,
+          title: entry ? entry.title : "Servicio",
+          user: entry ? entry.username : "usuario",
+          pass: entry ? entry.password : "secreto"
+        }),
+        pin: usePin ? "849201" : ""
+      };
+    }
+
+    if (!res || res.status !== "ok" || !res.payload) {
+      v24Log(res && res.message ? res.message : "Error generando código QR", "error");
+      return;
+    }
+
+    vaultCurrentQrPayload = res.payload;
+
+    if (usePin && res.pin) {
+      if (pinContainer) pinContainer.style.display = "flex";
+      if (pinBadge) pinBadge.textContent = res.pin;
+    } else {
+      if (pinContainer) pinContainer.style.display = "none";
+    }
+
+    // Renderizar código QR en el contenedor de alto contraste
+    container.innerHTML = "";
+    if (typeof QRCode !== "undefined") {
+      new QRCode(container, {
+        text: res.payload,
+        width: 210,
+        height: 210,
+        colorDark: "#0B0E17",
+        colorLight: "#FFFFFF",
+        correctLevel: QRCode.CorrectLevel ? QRCode.CorrectLevel.M : 0
+      });
+    } else {
+      container.textContent = "Error: Motor QRCode no cargado.";
+    }
+
+    // Iniciar temporizador de seguridad de 60 segundos con auto-cierre
+    if (vaultQrCountdownTimer) clearInterval(vaultQrCountdownTimer);
+    let secondsLeft = 60;
+    if (timerEl) timerEl.textContent = String(secondsLeft);
+
+    vaultQrCountdownTimer = setInterval(() => {
+      secondsLeft--;
+      if (timerEl) timerEl.textContent = String(Math.max(0, secondsLeft));
+      if (secondsLeft <= 0) {
+        closeVaultQrModal();
+        v24Log("Modal QR cerrado automáticamente por seguridad.", "info");
+      }
+    }, 1000);
+
+    modal.classList.add("open");
+  } catch (err) {
+    v24Log(`Error abriendo código QR: ${err}`, "error");
+  }
+}
+
+function closeVaultQrModal() {
+  const modal = document.getElementById("vault-qr-modal");
+  if (modal) modal.classList.remove("open");
+
+  if (vaultQrCountdownTimer) {
+    clearInterval(vaultQrCountdownTimer);
+    vaultQrCountdownTimer = null;
+  }
+
+  const container = document.getElementById("vault-qr-canvas-container");
+  if (container) container.innerHTML = "";
+
+  vaultCurrentQrEntryId = null;
+  vaultCurrentQrPayload = "";
+}
+
+async function openVaultSyncModal() {
+  const modal = document.getElementById("vault-sync-modal");
+  const container = document.getElementById("vault-sync-qr-container");
+  const urlEl = document.getElementById("vault-sync-url");
+  const badgeEl = document.getElementById("vault-sync-status-badge");
+  const statusTextEl = document.getElementById("vault-sync-status-text");
+  const clientsEl = document.getElementById("vault-sync-clients-count");
+
+  if (!modal || !container) return;
+
+  try {
+    let res = null;
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.vault_start_mobile_sync) {
+      res = await window.pywebview.api.vault_start_mobile_sync();
+    } else {
+      // Mock para vista previa en navegador
+      const mockIp = "192.168.1.100";
+      const mockPort = 8765;
+      const mockToken = "token_preview_sync";
+      res = {
+        status: "ok",
+        url: `http://${mockIp}:${mockPort}/mobile?token=${mockToken}`,
+        token: mockToken,
+        qr_payload: JSON.stringify({
+          v: 1,
+          type: "pair",
+          url: `http://${mockIp}:${mockPort}`,
+          token: mockToken,
+          ip: mockIp,
+          port: mockPort
+        }),
+        ip: mockIp,
+        port: mockPort
+      };
+    }
+
+    if (!res || res.status !== "ok") {
+      v24Log(res && res.message ? res.message : "Error iniciando servidor de sincronización", "error");
+      return;
+    }
+
+    const fullUrl = res.url || `http://${res.ip}:${res.port}/mobile?token=${res.token}`;
+    if (urlEl) urlEl.textContent = fullUrl;
+
+    // Renderizar código QR de emparejamiento
+    container.innerHTML = "";
+    const qrPairString = res.url || res.qr_payload;
+    if (typeof QRCode !== "undefined") {
+      new QRCode(container, {
+        text: qrPairString,
+        width: 210,
+        height: 210,
+        colorDark: "#0B0E17",
+        colorLight: "#FFFFFF",
+        correctLevel: QRCode.CorrectLevel ? QRCode.CorrectLevel.M : 0
+      });
+    } else {
+      container.textContent = "Error: Motor QRCode no cargado.";
+    }
+
+    if (badgeEl) badgeEl.classList.add("active");
+    if (statusTextEl) statusTextEl.textContent = `Servidor activo en ${res.ip}:${res.port}`;
+    if (clientsEl) clientsEl.textContent = "Dispositivos conectados: 0";
+
+    // Iniciar sondeo periódico del estado de sincronización
+    if (vaultSyncInterval) clearInterval(vaultSyncInterval);
+    vaultSyncInterval = setInterval(async () => {
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.vault_get_mobile_sync_status) {
+        try {
+          const st = await window.pywebview.api.vault_get_mobile_sync_status();
+          if (st) {
+            if (st.running) {
+              if (badgeEl) badgeEl.classList.add("active");
+              if (statusTextEl) statusTextEl.textContent = `Servidor activo en ${res.ip}:${res.port}`;
+            } else {
+              if (badgeEl) badgeEl.classList.remove("active");
+              if (statusTextEl) statusTextEl.textContent = "Servidor detenido";
+            }
+            if (clientsEl) {
+              clientsEl.textContent = `Dispositivos conectados: ${st.clients_connected || 0}`;
+            }
+            if (st.last_sync && st.last_sync > 0) {
+              refreshVaultEntries();
+            }
+          }
+        } catch (e) {
+          // Ignorar fallo transitorio en sondeo
+        }
+      }
+    }, 2500);
+
+    modal.classList.add("open");
+  } catch (err) {
+    v24Log(`Error al iniciar sincronización móvil: ${err}`, "error");
+  }
+}
+
+async function closeVaultSyncModal(stopServer = false) {
+  const modal = document.getElementById("vault-sync-modal");
+  if (modal) modal.classList.remove("open");
+
+  if (vaultSyncInterval) {
+    clearInterval(vaultSyncInterval);
+    vaultSyncInterval = null;
+  }
+
+  const container = document.getElementById("vault-sync-qr-container");
+  if (container) container.innerHTML = "";
+
+  if (stopServer) {
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.vault_stop_mobile_sync) {
+      try {
+        const res = await window.pywebview.api.vault_stop_mobile_sync();
+        if (res && res.status === "ok") {
+          v24Log("Servidor de sincronización móvil detenido.", "info");
+        }
+      } catch (e) {
+        v24Log(`Error al detener sincronización: ${e}`, "error");
+      }
+    }
+  }
 }
 
 // =========================================================================
@@ -752,6 +997,8 @@ function initV24Modules() {
   const btnVaultLock = document.getElementById("btn-vault-lock");
   if (btnVaultLock) {
     btnVaultLock.addEventListener("click", async () => {
+      closeVaultQrModal();
+      closeVaultSyncModal(true);
       const res = await window.pywebview.api.vault_lock();
       clearVaultForm();
       v24Log("Bóveda bloqueada y memoria limpiada.", "info");
@@ -865,9 +1112,103 @@ function initV24Modules() {
   if (vaultSearch) {
     vaultSearch.addEventListener("input", () => applyVaultSearchAndFilter());
   }
+
+  // --- Sincronización Móvil & Modales QR (Milestone 2) ---
+  const btnVaultSync = document.getElementById("btn-vault-sync");
+  if (btnVaultSync) {
+    btnVaultSync.addEventListener("click", () => openVaultSyncModal());
+  }
+
+  const btnSyncClose = document.getElementById("btn-vault-sync-close");
+  if (btnSyncClose) {
+    btnSyncClose.addEventListener("click", () => closeVaultSyncModal(false));
+  }
+
+  const btnSyncStop = document.getElementById("btn-vault-sync-stop");
+  if (btnSyncStop) {
+    btnSyncStop.addEventListener("click", () => closeVaultSyncModal(true));
+  }
+
+  const btnSyncCopyUrl = document.getElementById("btn-vault-sync-copy-url");
+  if (btnSyncCopyUrl) {
+    btnSyncCopyUrl.addEventListener("click", async () => {
+      const urlEl = document.getElementById("vault-sync-url");
+      const urlText = urlEl ? urlEl.textContent : "";
+      if (urlText) {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(urlText);
+          } else if (window.pywebview && window.pywebview.api && window.pywebview.api.vault_copy_secret) {
+            await window.pywebview.api.vault_copy_secret(urlText, 60);
+          }
+          const orig = btnSyncCopyUrl.textContent;
+          btnSyncCopyUrl.textContent = "✓";
+          setTimeout(() => { btnSyncCopyUrl.textContent = orig; }, 2000);
+          v24Log("Enlace de sincronización copiado.", "success");
+        } catch (e) {
+          v24Log(`Error copiando enlace: ${e}`, "error");
+        }
+      }
+    });
+  }
+
+  const btnQrClose = document.getElementById("btn-vault-qr-close");
+  if (btnQrClose) {
+    btnQrClose.addEventListener("click", () => closeVaultQrModal());
+  }
+
+  const btnQrCopy = document.getElementById("btn-vault-qr-copy");
+  if (btnQrCopy) {
+    btnQrCopy.addEventListener("click", async () => {
+      if (vaultCurrentQrPayload) {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(vaultCurrentQrPayload);
+          } else if (window.pywebview && window.pywebview.api && window.pywebview.api.vault_copy_secret) {
+            await window.pywebview.api.vault_copy_secret(vaultCurrentQrPayload, 60);
+          }
+          const orig = btnQrCopy.textContent;
+          btnQrCopy.textContent = "✓ Copiado";
+          setTimeout(() => { btnQrCopy.textContent = orig; }, 2000);
+          v24Log("Texto del código QR copiado al portapapeles.", "success");
+        } catch (e) {
+          v24Log(`Error copiando texto QR: ${e}`, "error");
+        }
+      }
+    });
+  }
+
+  const pinToggle = document.getElementById("vault-qr-pin-toggle");
+  if (pinToggle) {
+    pinToggle.addEventListener("change", (e) => {
+      if (vaultCurrentQrEntryId) {
+        openVaultQrModal(vaultCurrentQrEntryId, e.target.checked);
+      }
+    });
+  }
+
+  // Cierre de modales al hacer clic en el fondo difuminado (overlay)
+  const qrModal = document.getElementById("vault-qr-modal");
+  if (qrModal) {
+    qrModal.addEventListener("click", (e) => {
+      if (e.target === qrModal) closeVaultQrModal();
+    });
+  }
+  const syncModal = document.getElementById("vault-sync-modal");
+  if (syncModal) {
+    syncModal.addEventListener("click", (e) => {
+      if (e.target === syncModal) closeVaultSyncModal(false);
+    });
+  }
 }
 
+window.V24State = V24State;
 window.initV24Modules = initV24Modules;
+window.openVaultQrModal = openVaultQrModal;
+window.closeVaultQrModal = closeVaultQrModal;
+window.openVaultSyncModal = openVaultSyncModal;
+window.closeVaultSyncModal = closeVaultSyncModal;
+
 window.onV24TabSelected = function (tabId) {
   if (tabId === "tab-monitor") loadMonitorView();
   else if (tabId === "tab-hardware") loadHardwareView();

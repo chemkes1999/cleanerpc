@@ -11,7 +11,19 @@ import sys
 import threading
 import subprocess
 import json
+import socket
+import http.server
+import urllib.parse
+import secrets
+import base64
+import time
 from pathlib import Path
+
+try:
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+except ImportError:
+    AESGCM = None
+
 import cleaner
 import sys_monitor
 import hardware_health
@@ -24,12 +36,406 @@ except ImportError:
     webview = None
 
 
+def get_lan_ip() -> str:
+    """Detecta la dirección IP en la red local (LAN) usando una sonda UDP sin tráfico real."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("10.255.255.255", 1))
+            ip = s.getsockname()[0]
+        except Exception:
+            s.connect(("8.8.8.8", 1))
+            ip = s.getsockname()[0]
+        finally:
+            s.close()
+        if ip and not ip.startswith("127."):
+            return ip
+    except Exception:
+        pass
+    return "127.0.0.1"
+
+
+class _RunningStatus:
+    def __init__(self, check_fn):
+        self._check_fn = check_fn
+
+    def __call__(self) -> bool:
+        return self._check_fn()
+
+    def __bool__(self) -> bool:
+        return self._check_fn()
+
+    def __eq__(self, other) -> bool:
+        return self._check_fn() == other
+
+
+class _SyncThreadingHTTPServer(http.server.ThreadingHTTPServer):
+    request_queue_size = 128
+    daemon_threads = True
+    allow_reuse_address = True
+
+
+class VaultSyncServer:
+    """
+    Servidor HTTP en segundo plano (LAN) para sincronización segura Zero-Knowledge
+    con la aplicación web móvil compañera (PWA) de PyClean Pro.
+    """
+
+    def __init__(
+        self,
+        vault_instance: vault.PasswordVault,
+        host: str = "0.0.0.0",
+        port: int = 8765,
+        default_port: int | None = None,
+        token_ttl: int = 300,
+    ):
+        self.vault = vault_instance
+        self.host = host
+        self.port = default_port if default_port is not None else port
+        self.default_port = self.port
+        self.token_ttl = token_ttl
+        self.server: http.server.ThreadingHTTPServer | None = None
+        self.thread: threading.Thread | None = None
+        self.token: str | None = None
+        self.token_created_at: float = 0.0
+        self.token_expires_at: float = 0.0
+        self.clients_connected: int = 0
+        self.last_sync: int = 0
+        self._lock = threading.RLock()
+
+    def _check_running(self) -> bool:
+        with self._lock:
+            return self.server is not None and self.thread is not None and self.thread.is_alive()
+
+    @property
+    def is_running(self) -> bool:
+        return self._check_running()
+
+    def get_is_running(self) -> bool:
+        return self._check_running()
+
+    def generate_pairing_token(self, ttl_seconds: int = 300) -> str:
+        with self._lock:
+            self.token = secrets.token_urlsafe(24)
+            self.token_created_at = time.time()
+            self.token_ttl = ttl_seconds
+            self.token_expires_at = self.token_created_at + ttl_seconds
+            return self.token
+
+    def is_token_valid(self, candidate_token: str) -> bool:
+        with self._lock:
+            if not self.token or not candidate_token:
+                return False
+            now = time.time()
+            if self.token_expires_at > 0 and now > self.token_expires_at:
+                return False
+            if (now - self.token_created_at) > self.token_ttl:
+                return False
+            return secrets.compare_digest(self.token, candidate_token)
+
+    def start(self, port: int | None = None) -> dict:
+        with self._lock:
+            if self.server is not None and self.thread is not None and self.thread.is_alive():
+                ip = get_lan_ip()
+                return {
+                    "status": "ok",
+                    "running": True,
+                    "url": f"http://{ip}:{self.port}/mobile/?token={self.token}",
+                    "token": self.token,
+                    "ip": ip,
+                    "port": self.port,
+                }
+
+            target_port = self.port if port is None else port
+            if not self.token:
+                self.generate_pairing_token(ttl_seconds=self.token_ttl)
+            handler_factory = self._build_handler()
+
+            try:
+                self.server = _SyncThreadingHTTPServer((self.host, target_port), handler_factory)
+                self.port = self.server.server_address[1]
+            except OSError:
+                self.server = _SyncThreadingHTTPServer((self.host, 0), handler_factory)
+                self.port = self.server.server_address[1]
+
+            self.server.daemon_threads = True
+            self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+            self.thread.start()
+
+            ip = get_lan_ip()
+            return {
+                "status": "ok",
+                "running": True,
+                "url": f"http://{ip}:{self.port}/mobile/?token={self.token}",
+                "token": self.token,
+                "ip": ip,
+                "port": self.port,
+            }
+
+    def stop(self) -> dict:
+        with self._lock:
+            if self.server:
+                try:
+                    self.server.shutdown()
+                    self.server.server_close()
+                except Exception:
+                    pass
+                self.server = None
+            if self.thread and self.thread.is_alive():
+                self.thread.join(timeout=1.0)
+                self.thread = None
+            self.token = None
+            return {"status": "ok", "running": False}
+
+    def get_status(self) -> dict:
+        with self._lock:
+            running = self.server is not None and self.thread is not None and self.thread.is_alive()
+            return {
+                "running": running,
+                "clients_connected": self.clients_connected,
+                "last_sync": self.last_sync,
+                "port": self.port if running else 0,
+                "ip": get_lan_ip() if running else "",
+            }
+
+    def _build_handler(self):
+        sync_server = self
+
+        class SyncHTTPHandler(http.server.BaseHTTPRequestHandler):
+            def log_message(self, format, *args):
+                pass
+
+            def _send_cors_headers(self):
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+            def _send_json(self, status_code: int, data: dict):
+                body = json.dumps(data, ensure_ascii=False).encode("utf-8")
+                self.send_response(status_code)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Connection", "close")
+                self._send_cors_headers()
+                self.end_headers()
+                self.wfile.write(body)
+                try:
+                    self.wfile.flush()
+                except Exception:
+                    pass
+                self.close_connection = True
+
+            def do_OPTIONS(self):
+                self.send_response(200)
+                self._send_cors_headers()
+                self.end_headers()
+
+            def do_GET(self):
+                parsed = urllib.parse.urlparse(self.path)
+                req_path = parsed.path
+                params = urllib.parse.parse_qs(parsed.query)
+                token = params.get("token", [""])[0]
+
+                # Rutas estáticas móviles: /mobile/* o /
+                if req_path == "/" or req_path.startswith("/mobile"):
+                    self._serve_mobile(req_path)
+                    return
+
+                # Endpoints de API protegidos con token
+                if not sync_server.is_token_valid(token):
+                    self._send_json(401, {"status": "error", "message": "Unauthorized: invalid or expired pairing token"})
+                    return
+
+                if req_path == "/api/sync/info":
+                    if not sync_server.vault.exists():
+                        self._send_json(404, {"status": "error", "message": "Bóveda no encontrada."})
+                        return
+                    try:
+                        container = sync_server.vault.export_vault_sync_payload()
+                        with sync_server._lock:
+                            sync_server.clients_connected += 1
+                        self._send_json(200, {
+                            "status": "ok",
+                            "vault_name": "PyClean Pro",
+                            "version": container.get("version", 1),
+                            "kdf": container.get("kdf", "pbkdf2-sha256"),
+                            "iterations": container.get("iterations", 600000),
+                            "salt": container.get("salt", ""),
+                        })
+                    except Exception as e:
+                        self._send_json(500, {"status": "error", "message": str(e)})
+                    return
+
+                if req_path == "/api/sync/vault":
+                    if not sync_server.vault.exists():
+                        self._send_json(404, {"status": "error", "message": "Bóveda no encontrada."})
+                        return
+                    try:
+                        container = sync_server.vault.export_vault_sync_payload()
+                        with sync_server._lock:
+                            sync_server.clients_connected += 1
+                        data = dict(container)
+                        data["status"] = "ok"
+                        self._send_json(200, data)
+                    except Exception as e:
+                        self._send_json(500, {"status": "error", "message": str(e)})
+                    return
+
+                self._send_json(404, {"status": "error", "message": "Endpoint no encontrado"})
+
+            def do_POST(self):
+                parsed = urllib.parse.urlparse(self.path)
+                req_path = parsed.path
+                params = urllib.parse.parse_qs(parsed.query)
+                token = params.get("token", [""])[0]
+
+                if not sync_server.is_token_valid(token):
+                    self._send_json(401, {"status": "error", "message": "Unauthorized: invalid or expired pairing token"})
+                    return
+
+                if req_path == "/api/sync/vault":
+                    try:
+                        content_len = int(self.headers.get("Content-Length", 0))
+                        raw_body = self.rfile.read(content_len)
+                        payload = json.loads(raw_body.decode("utf-8"))
+                    except Exception as e:
+                        self._send_json(400, {"status": "error", "message": f"JSON inválido: {e}"})
+                        return
+
+                    if not isinstance(payload, dict):
+                        self._send_json(400, {"status": "error", "message": "JSON body must be an object."})
+                        return
+
+                    # Caso A: Array de credenciales descifradas ("entries")
+                    if "entries" in payload:
+                        try:
+                            if not sync_server.vault.is_unlocked():
+                                self._send_json(400, {
+                                    "status": "error",
+                                    "message": "La bóveda en el PC debe estar desbloqueada para fusionar credenciales.",
+                                })
+                                return
+                            with sync_server.vault._lock:
+                                merged, total = sync_server.vault.merge_entries(payload["entries"])
+                            with sync_server._lock:
+                                sync_server.last_sync = int(time.time())
+                                sync_server.clients_connected += 1
+                            self._send_json(200, {"status": "ok", "merged": merged, "total": total})
+                        except Exception as e:
+                            self._send_json(500, {"status": "error", "message": str(e)})
+                        return
+
+                    # Caso B: Contenedor cifrado entrante ("ciphertext", etc.)
+                    envelope = payload.get("vault") if "vault" in payload else payload
+                    if "ciphertext" in envelope and "nonce" in envelope:
+                        if not sync_server.vault.is_unlocked():
+                            self._send_json(400, {
+                                "status": "error",
+                                "message": "La bóveda en el PC debe estar desbloqueada para procesar el contenedor cifrado.",
+                            })
+                            return
+                        try:
+                            incoming_salt = base64.b64decode(envelope["salt"])
+                            incoming_nonce = base64.b64decode(envelope["nonce"])
+                            incoming_ct = base64.b64decode(envelope["ciphertext"])
+
+                            with sync_server.vault._lock:
+                                if incoming_salt == sync_server.vault._salt and sync_server.vault._key:
+                                    if AESGCM is None:
+                                        self._send_json(500, {"status": "error", "message": "AESGCM no disponible"})
+                                        return
+                                    aesgcm = AESGCM(sync_server.vault._key)
+                                    pt = aesgcm.decrypt(incoming_nonce, incoming_ct, vault.VAULT_AAD)
+                                    inc_dict = json.loads(pt.decode("utf-8"))
+                                    merged, total = sync_server.vault.merge_entries(inc_dict.get("entries", []))
+                                else:
+                                    self._send_json(400, {
+                                        "status": "error",
+                                        "message": "El salt del contenedor entrante no coincide con la bóveda local.",
+                                    })
+                                    return
+                            with sync_server._lock:
+                                sync_server.last_sync = int(time.time())
+                                sync_server.clients_connected += 1
+                            self._send_json(200, {"status": "ok", "merged": merged, "total": total})
+                            return
+                        except Exception as e:
+                            self._send_json(400, {"status": "error", "message": f"Error descifrando contenedor: {e}"})
+                            return
+
+                    self._send_json(400, {"status": "error", "message": "Payload no reconocido (se requiere 'entries' o 'ciphertext')."})
+                    return
+
+                self._send_json(404, {"status": "error", "message": "Endpoint no encontrado"})
+
+            def _serve_mobile(self, req_path: str):
+                rel = req_path.lstrip("/")
+                if rel.startswith("mobile"):
+                    rel = rel[len("mobile"):].lstrip("/")
+                if not rel or rel == "/":
+                    rel = "index.html"
+
+                base_dir = Path(__file__).resolve().parent / "web" / "mobile"
+                target = (base_dir / rel).resolve()
+
+                try:
+                    target.relative_to(base_dir)
+                except ValueError:
+                    self._send_json(403, {"status": "error", "message": "Acceso denegado"})
+                    return
+
+                if target.is_file():
+                    ext = target.suffix.lower()
+                    mime_types = {
+                        ".html": "text/html; charset=utf-8",
+                        ".js": "application/javascript; charset=utf-8",
+                        ".css": "text/css; charset=utf-8",
+                        ".json": "application/json; charset=utf-8",
+                        ".webmanifest": "application/manifest+json; charset=utf-8",
+                        ".svg": "image/svg+xml",
+                        ".png": "image/png",
+                        ".jpg": "image/jpeg",
+                        ".ico": "image/x-icon",
+                    }
+                    ctype = mime_types.get(ext, "application/octet-stream")
+                    try:
+                        content = target.read_bytes()
+                        self.send_response(200)
+                        self.send_header("Content-Type", ctype)
+                        self.send_header("Content-Length", str(len(content)))
+                        self._send_cors_headers()
+                        self.end_headers()
+                        self.wfile.write(content)
+                        return
+                    except Exception:
+                        pass
+
+                placeholder = (
+                    "<!DOCTYPE html>\n"
+                    "<html lang='es'>\n"
+                    "<head><meta charset='utf-8'><title>PyClean Pro Mobile Companion</title></head>\n"
+                    "<body style='font-family:system-ui,sans-serif;background:#0F111A;color:#F8FAFC;padding:2rem;'>\n"
+                    "<h2>📱 PyClean Pro Companion</h2>\n"
+                    "<p>El servidor de sincronización está activo y listo para transferir credenciales.</p>\n"
+                    "</body></html>"
+                ).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(placeholder)))
+                self._send_cors_headers()
+                self.end_headers()
+                self.wfile.write(placeholder)
+
+        return SyncHTTPHandler
+
+
 class PyCleanAPI:
     def __init__(self):
         self._window = None
         self._is_busy = False
         self._vault = vault.PasswordVault()
         self._clipboard_timer = None
+        self._sync_server = VaultSyncServer(self._vault)
 
     def set_window(self, window):
         self._window = window
@@ -492,6 +898,54 @@ class PyCleanAPI:
         target = src[0] if isinstance(src, (list, tuple)) else src
         ok, msg = self._vault.import_encrypted_backup(target)
         return {"success": ok, "message": msg, "status": self._vault.status()}
+
+    def vault_get_qr_payload(self, entry_id: str, use_pin: bool = False, pin: str = ""):
+        try:
+            if use_pin and not pin:
+                pin = f"{secrets.randbelow(900000) + 100000:06d}"
+            payload = self._vault.generate_credential_qr_payload(entry_id, use_pin=use_pin, pin=pin)
+            return {"status": "ok", "payload": payload, "pin": pin}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def vault_start_mobile_sync(self, port: int = 8765):
+        try:
+            self._sync_server.vault = self._vault
+            res = self._sync_server.start(port=port)
+            token = res["token"]
+            ip = res["ip"]
+            assigned_port = res["port"]
+            qr_payload = json.dumps({
+                "v": 1,
+                "type": "pair",
+                "url": f"http://{ip}:{assigned_port}",
+                "token": token,
+                "ip": ip,
+                "port": assigned_port,
+            }, separators=(",", ":"))
+            return {
+                "status": "ok",
+                "url": res["url"],
+                "token": token,
+                "qr_payload": qr_payload,
+                "ip": ip,
+                "port": assigned_port,
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def vault_stop_mobile_sync(self):
+        try:
+            self._sync_server.stop()
+            return {"status": "ok"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def vault_get_mobile_sync_status(self):
+        try:
+            return self._sync_server.get_status()
+        except Exception as e:
+            return {"running": False, "clients_connected": 0, "last_sync": 0, "error": str(e)}
 
 
 def run_web_gui():

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#090B10">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PyClean Vault">
+  <title>PyClean Pro Vault - Móvil</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="mobile.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header & Navigation -->
+    <header class="mobile-header">
+      <div class="brand-wrapper">
+        <div class="brand-logo">
+          <svg viewBox="0 0 24 24"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm0 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/></svg>
+        </div>
+        <span class="brand-title">PyClean Vault</span>
+      </div>
+      <div class="header-actions">
+        <div class="status-badge locked" id="vault-status-badge">
+          <span class="status-dot"></span>
+          <span id="vault-status-text">Bloqueada</span>
+        </div>
+        <button class="icon-btn" id="btn-header-sync" title="Sincronización LAN">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+        </button>
+        <button class="icon-btn" id="btn-header-scan" title="Escanear QR">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>
+        </button>
+        <button class="icon-btn" id="btn-header-lock" title="Bloquear Bóveda" style="display: none;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Content Views -->
+    <main class="view-container">
+
+      <!-- View 1: Unlock View -->
+      <section class="view active" id="view-unlock">
+        <div class="unlock-box">
+          <div class="unlock-hero-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm1 14h-2v-2h2v2zm0-4h-2V7h2v5z"/></svg>
+          </div>
+          <h2 class="unlock-title">Bóveda Cifrada</h2>
+          <p class="unlock-desc">Zero-Knowledge AES-256-GCM. Introduce tu contraseña maestra para descifrar tus credenciales locales.</p>
+          
+          <div class="input-group">
+            <input type="password" class="text-input" id="unlock-password-input" placeholder="Contraseña Maestra..." autocomplete="current-password">
+            <button class="input-suffix-btn" id="btn-toggle-unlock-pass" type="button" title="Mostrar/ocultar">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </button>
+          </div>
+
+          <div id="unlock-error" style="color: var(--danger); font-size: 0.85rem; margin-bottom: 12px; display: none;"></div>
+
+          <button class="btn-primary" id="btn-unlock-vault">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 9.9-1"></path></svg>
+            Desbloquear Bóveda
+          </button>
+
+          <button class="btn-secondary" id="btn-scan-to-pair">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>
+            Escanear Código QR desde PC
+          </button>
+        </div>
+      </section>
+
+      <!-- View 2: Credentials List View -->
+      <section class="view" id="view-list">
+        <div class="list-controls">
+          <div class="search-box">
+            <span class="search-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </span>
+            <input type="text" class="search-input" id="search-credentials-input" placeholder="Buscar por servicio, usuario o notas...">
+          </div>
+
+          <div class="category-chips" id="category-chips">
+            <button class="chip active" data-category="Todas">Todas</button>
+            <button class="chip" data-category="General">General</button>
+            <button class="chip" data-category="Social">Social</button>
+            <button class="chip" data-category="Trabajo">Trabajo</button>
+            <button class="chip" data-category="Finanzas">Finanzas</button>
+            <button class="chip" data-category="Personal">Personal</button>
+          </div>
+        </div>
+
+        <div class="credentials-list" id="credentials-list">
+          <!-- Tarjetas renderizadas dinámicamente -->
+        </div>
+
+        <div class="empty-state" id="empty-list-state" style="display: none;">
+          <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          <p>No se encontraron credenciales.</p>
+        </div>
+
+        <!-- FAB for Quick QR Scan -->
+        <div class="fab-container">
+          <button class="fab" id="fab-scan" title="Escanear QR">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect></svg>
+          </button>
+        </div>
+      </section>
+
+      <!-- View 3: Credential Detail View -->
+      <section class="view" id="view-detail">
+        <div class="detail-card">
+          <div class="detail-header">
+            <div class="service-avatar" id="detail-avatar">?</div>
+            <div style="flex: 1; min-width: 0;">
+              <h2 id="detail-title" style="font-size: 1.25rem; font-weight: 700;">Título</h2>
+              <span class="status-badge" id="detail-category-badge">General</span>
+            </div>
+            <button class="icon-btn" id="btn-back-to-list" title="Volver al listado">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+
+          <div class="detail-field">
+            <span class="detail-label">Usuario / Correo</span>
+            <div class="detail-value-row">
+              <span class="detail-value" id="detail-username">—</span>
+              <button class="action-btn" id="btn-copy-detail-user" title="Copiar usuario">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="detail-field">
+            <span class="detail-label">Contraseña</span>
+            <div class="detail-value-row">
+              <span class="detail-value masked-pass" id="detail-password">••••••••••••</span>
+              <div style="display: flex; gap: 6px;">
+                <button class="action-btn" id="btn-toggle-detail-pass" title="Mostrar/Ocultar contraseña">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                </button>
+                <button class="action-btn" id="btn-copy-detail-pass" title="Copiar contraseña (30s)">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-field" id="detail-url-row" style="display: none;">
+            <span class="detail-label">Sitio Web / URL</span>
+            <div class="detail-value-row">
+              <span class="detail-value" id="detail-url" style="color: var(--accent-cyan); font-size: 0.9rem;">—</span>
+              <button class="action-btn" id="btn-open-url" title="Abrir en navegador">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="detail-field" id="detail-notes-row" style="display: none;">
+            <span class="detail-label">Notas Adicionales</span>
+            <div class="detail-value-row" style="align-items: flex-start;">
+              <span class="detail-value" id="detail-notes" style="font-size: 0.9rem; color: var(--text-muted);">—</span>
+            </div>
+          </div>
+
+          <div style="margin-top: 8px;">
+            <button class="btn-secondary" id="btn-delete-entry" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.3);">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              Eliminar Credencial
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- View 4: Camera QR Scanner View -->
+      <section class="view" id="view-scanner">
+        <div class="scanner-viewport-wrapper">
+          <video id="scanner-video" playsinline muted></video>
+          <div class="scanner-target-guide">
+            <div class="scanner-laser"></div>
+          </div>
+        </div>
+
+        <div class="scanner-controls">
+          <button class="icon-btn" id="btn-flip-camera" title="Girar cámara">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0-4.42-3.58-8-8-8s-8 3.58-8 8c0 .41.04.81.1 1.2M4 14c0 4.42 3.58 8 8 8s8-3.58 8-8c0-.41-.04-.81-.1-1.2"></path><polyline points="1 10 5 10 5 6"></polyline><polyline points="23 14 19 14 19 18"></polyline></svg>
+          </button>
+          <button class="icon-btn" id="btn-toggle-torch" title="Linterna" style="display: none;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          </button>
+          <button class="icon-btn" id="btn-trigger-file-input" title="Subir imagen con QR">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+          </button>
+          <input type="file" id="file-input-qr" accept="image/*" style="display: none;">
+          <button class="icon-btn" id="btn-close-scanner" title="Cerrar escáner">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+
+        <div class="scanner-fallback-box">
+          <span class="detail-label">¿Problemas con la cámara? Pega el código QR aquí:</span>
+          <textarea class="text-input" id="manual-qr-input" rows="2" placeholder="Pega el texto o payload JSON del QR..."></textarea>
+          <button class="btn-secondary" id="btn-submit-manual-qr">Procesar Código Pegado</button>
+        </div>
+      </section>
+
+      <!-- View 5: Sync & Pairing View -->
+      <section class="view" id="view-sync">
+        <div class="sync-card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="font-size: 1.25rem; font-weight: 700;">Sincronización LAN</h2>
+            <button class="icon-btn" id="btn-back-from-sync" title="Volver">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+
+          <p style="font-size: 0.85rem; color: var(--text-muted);">
+            Sincroniza tus credenciales directamente por Wi-Fi local sin pasar por internet ni servidores externos (Zero-Knowledge).
+          </p>
+
+          <div class="detail-field">
+            <span class="detail-label">IP del PC en la red local</span>
+            <input type="text" class="text-input" id="sync-ip-input" placeholder="192.168.1.100">
+          </div>
+
+          <div class="detail-field">
+            <span class="detail-label">Puerto</span>
+            <input type="text" class="text-input" id="sync-port-input" placeholder="8765">
+          </div>
+
+          <div class="detail-field">
+            <span class="detail-label">Token de Emparejamiento</span>
+            <input type="text" class="text-input" id="sync-token-input" placeholder="Token efímero del PC...">
+          </div>
+
+          <button class="btn-secondary" id="btn-test-connection">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+            Probar Conexión con PC
+          </button>
+
+          <div id="sync-status-msg" style="font-size: 0.85rem; min-height: 20px;"></div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 8px;">
+            <button class="btn-primary" id="btn-pull-sync">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 17 12 21 16 17"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"></path></svg>
+              Descargar de PC (Fusión Inteligente)
+            </button>
+
+            <button class="btn-secondary" id="btn-push-sync">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path><polyline points="16 16 12 12 8 16"></polyline></svg>
+              Subir a PC (Enviar mis cambios)
+            </button>
+          </div>
+
+          <hr style="border: none; border-top: 1px solid var(--border); margin: 12px 0;">
+
+          <span class="detail-label">Respaldos Manuales Fuera de Línea</span>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-secondary" id="btn-export-local-backup" style="flex: 1;">Exportar .vault</button>
+            <button class="btn-secondary" id="btn-trigger-import-backup" style="flex: 1;">Importar .vault</button>
+            <input type="file" id="file-input-import-backup" accept=".vault,.json,.enc" style="display: none;">
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Modal for 6-digit PIN Decryption -->
+    <div class="modal-overlay" id="pin-modal">
+      <div class="modal-content">
+        <h3 style="font-size: 1.15rem; font-weight: 700;">Credencial Protegida con PIN</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">
+          Este código QR está cifrado con un PIN numérico efímero. Introduce el PIN de 6 dígitos que se muestra en tu PC:
+        </p>
+        <input type="number" class="text-input" id="pin-modal-input" placeholder="123456" maxlength="8" style="text-align: center; font-size: 1.4rem; letter-spacing: 6px;">
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+          <button class="btn-secondary" id="btn-cancel-pin" style="flex: 1;">Cancelar</button>
+          <button class="btn-primary" id="btn-submit-pin" style="flex: 1;">Descifrar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div class="toast-container" id="toast-container"></div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="jsqr.min.js"></script>
+  <script src="crypto.js"></script>
+  <script src="storage.js"></script>
+  <script src="scanner.js"></script>
+  <script src="mobile.js"></script>
+</body>
+</html>

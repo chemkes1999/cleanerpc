@@ -14,3 +14,6 @@ dist/
 # Local config
 cleaner_config.json
 *.log
+
+# Internal agent data
+.agents/

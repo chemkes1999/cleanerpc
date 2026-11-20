@@ -1,0 +1,22 @@
+{
+  "name": "PyClean Pro Vault",
+  "short_name": "Vault",
+  "description": "Bóveda local segura de contraseñas con cifrado Zero-Knowledge AES-256-GCM y sincronización QR/LAN offline",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#090B10",
+  "theme_color": "#090B10",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192' width='192' height='192'%3E%3Crect width='192' height='192' rx='40' fill='%23090B10'/%3E%3Cpath d='M96 28L42 52v42c0 36 23 70 54 78 31-8 54-42 54-78V52L96 28z' fill='%233B82F6'/%3E%3Cpath d='M96 38L52 58v36c0 30 19 58 44 65 25-7 44-35 44-65V58L96 38z' fill='%231E293B'/%3E%3Ccircle cx='96' cy='88' r='12' fill='%2306B6D4'/%3E%3Crect x='92' y='96' width='8' height='20' rx='4' fill='%2306B6D4'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512' width='512' height='512'%3E%3Crect width='512' height='512' rx='100' fill='%23090B10'/%3E%3Cpath d='M256 75L112 139v112c0 96 61 187 144 208 83-21 144-112 144-208V139L256 75z' fill='%233B82F6'/%3E%3Cpath d='M256 102L138 155v96c0 80 51 155 118 173 67-18 118-93 118-173v-96L256 102z' fill='%231E293B'/%3E%3Ccircle cx='256' cy='235' r='32' fill='%2306B6D4'/%3E%3Crect x='245' y='256' width='22' height='54' rx='11' fill='%2306B6D4'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
