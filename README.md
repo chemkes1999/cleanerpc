@@ -1,4 +1,4 @@
-# ⚡ PyClean Pro v2.7.0
+# ⚡ PyClean Pro v2.7.1
 
 **Suite integral de escritorio para limpieza segura, análisis visual de disco, monitoreo de procesos y red, diagnóstico de hardware, privacidad y bóveda local de contraseñas cifrada (Windows y macOS).**
 

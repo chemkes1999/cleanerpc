@@ -4,6 +4,21 @@ Todos los cambios notables en **PyClean Pro** se documentan en este archivo.
 
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto utiliza [Versionado Semántico](https://semver.org/lang/es/).
 
+## [2.7.1] - 2026-11-20
+
+### Añadido
+- **Compatibilidad con Cámara en Redes Locales Móviles (HTTP):**
+  - Botón de respaldo de un toque para captura de fotos con la app de cámara nativa del smartphone (`capture="environment"`), superando las restricciones de video WebRTC en navegadores móviles sin HTTPS.
+  - Notificación informativa contextual en la vista de escaneo móvil si el navegador no expone `getUserMedia`.
+- **Resiliencia en CI/CD:**
+  - Desacoplada la prueba de ciclo de vida de tokens de sincronización de retrasos de red/sockets en runners de CI.
+  - Flujo de publicación multiplataforma tolerante a fallos para asegurar la publicación de los instaladores de Windows.
+
+### Cambiado
+- Actualizados metadatos de versión a `2.7.1` en `installer.iss` y `version_info.txt`.
+
+---
+
 ## [2.7.0] - 2026-11-20
 
 ### Añadido
