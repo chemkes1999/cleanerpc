@@ -83,6 +83,8 @@
     DOM.btnTriggerFileInput = document.getElementById('btn-trigger-file-input');
     DOM.manualQrInput = document.getElementById('manual-qr-input');
     DOM.btnSubmitManualQr = document.getElementById('btn-submit-manual-qr');
+    DOM.cameraFallbackBanner = document.getElementById('camera-fallback-banner');
+    DOM.btnSnapFallback = document.getElementById('btn-snap-fallback');
 
     // Sync View
     DOM.btnBackFromSync = document.getElementById('btn-back-from-sync');
@@ -353,11 +355,13 @@
 
   // Scanner View & Camera
   async function startCamera() {
+    if (DOM.cameraFallbackBanner) DOM.cameraFallbackBanner.style.display = 'none';
     const started = await window.MobileScanner.startScanning({
       videoElement: DOM.scannerVideo,
       onDetected: handleQrDetection,
       onError: (err) => {
-        showToast("No se pudo iniciar la cámara: " + err.message, "warning", 4000);
+        if (DOM.cameraFallbackBanner) DOM.cameraFallbackBanner.style.display = 'block';
+        showToast("Cámara web no disponible en HTTP. Usa 'Tomar foto'.", "info", 5000);
       }
     });
 
@@ -756,6 +760,11 @@
     DOM.btnTriggerFileInput.addEventListener('click', () => {
       DOM.fileInputQr.click();
     });
+    if (DOM.btnSnapFallback) {
+      DOM.btnSnapFallback.addEventListener('click', () => {
+        DOM.fileInputQr.click();
+      });
+    }
     DOM.fileInputQr.addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
