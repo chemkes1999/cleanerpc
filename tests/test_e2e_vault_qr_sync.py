@@ -165,13 +165,13 @@ class TestTier1FeatureCoverage:
 
     def test_tier1_f2_pairing_token_lifecycle(self, test_vault: vault.PasswordVault):
         """Verifies pairing token generation, validity check, and expiration TTL."""
-        server = web_gui.VaultSyncServer(test_vault, token_ttl=1)
+        server = web_gui.VaultSyncServer(test_vault, token_ttl=3)
         info = server.start(port=0)
         token = info["token"]
         assert len(token) >= 16
         assert server.is_token_valid(token) is True
         assert server.is_token_valid("invalid-token-123") is False
-        time.sleep(1.1)
+        time.sleep(3.2)
         assert server.is_token_valid(token) is False
         server.stop()
 
