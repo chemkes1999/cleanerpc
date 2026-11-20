@@ -146,17 +146,19 @@ jobs:
   release:
     name: Publish Multi-OS GitHub Release
     needs: [build-windows, build-macos]
-    if: startsWith(github.ref, 'refs/tags/')
+    if: always() && startsWith(github.ref, 'refs/tags/') && (needs.build-windows.result == 'success' || needs.build-macos.result == 'success')
     runs-on: ubuntu-latest
 
     steps:
       - name: Download Windows Binaries
+        if: needs.build-windows.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: PyCleanPro-Windows-Binaries
           path: release_assets
 
       - name: Download macOS DMG
+        if: needs.build-macos.result == 'success'
         uses: actions/download-artifact@v4
         with:
           name: PyCleanPro-macOS-Binaries
@@ -165,18 +167,14 @@ jobs:
       - name: Generate Unified SHA-256 Checksums
         run: |
           cd release_assets
-          sha256sum PyCleanPro.exe PyCleanPro-Setup.exe PyCleanPro-macOS.dmg > SHA256SUMS.txt
+          sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
           ls -lh
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            release_assets/PyCleanPro.exe
-            release_assets/PyCleanPro-Setup.exe
-            release_assets/PyCleanPro-macOS.dmg
-            release_assets/SHA256SUMS.txt
+          files: release_assets/*
           name: PyClean Pro ${{ github.ref_name }}
           generate_release_notes: true
           draft: false
