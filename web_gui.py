@@ -29,6 +29,7 @@ import sys_monitor
 import hardware_health
 import context_menu
 import vault
+import sys_optimizer
 
 try:
     import webview
@@ -946,6 +947,83 @@ class PyCleanAPI:
             return self._sync_server.get_status()
         except Exception as e:
             return {"running": False, "clients_connected": 0, "last_sync": 0, "error": str(e)}
+
+    # System Optimization & Deep Cleaner API
+    def clean_dism(self, reset_base: bool = False):
+        """Ejecuta la limpieza del almacén de componentes DISM WinSxS."""
+        try:
+            return cleaner.run_dism_component_cleanup(reset_base=reset_base)
+        except Exception as e:
+            return {"success": False, "output": "", "reset_base": reset_base, "error": str(e)}
+
+    def clean_vss_shadows(self):
+        """Purga las instantáneas de restauración VSS más antiguas."""
+        try:
+            return cleaner.clean_vss_old_shadows()
+        except Exception as e:
+            return {"success": False, "output": "", "error": str(e)}
+
+    def prune_docker(self):
+        """Ejecuta docker system prune -f."""
+        try:
+            return cleaner.clean_docker_system()
+        except Exception as e:
+            return {"success": False, "output": "", "space_reclaimed": "0 B", "error": str(e)}
+
+    def scan_stale_node_modules(self, path: str = "", inactive_days: int = 90):
+        """Escanea proyectos en busca de carpetas node_modules inactivas."""
+        try:
+            return cleaner.find_stale_node_modules(root_dir=path, inactive_days=inactive_days)
+        except Exception as e:
+            return []
+
+    def delete_selected_node_modules(self, paths: list):
+        """Elimina las carpetas node_modules seleccionadas de forma segura."""
+        try:
+            return cleaner.delete_selected_node_modules(paths=paths)
+        except Exception as e:
+            return {
+                "success": False,
+                "deleted_count": 0,
+                "freed_bytes": 0,
+                "freed_formatted": "0 B",
+                "errors": [str(e)]
+            }
+
+    def set_ultimate_performance(self):
+        """Desbloquea y activa el plan de energía Ultimate Performance."""
+        try:
+            return sys_optimizer.unlock_ultimate_performance_plan()
+        except Exception as e:
+            return {"success": False, "message": str(e), "guid": ""}
+
+    def optimize_tcp_stack(self, enable_autotuning: bool = True):
+        """Ajusta y optimiza los parámetros TCP/IP del sistema."""
+        try:
+            return sys_optimizer.tune_tcp_network(enable_autotuning=enable_autotuning)
+        except Exception as e:
+            return {"success": False, "message": str(e), "autotuning": ""}
+
+    def repair_search_indexer(self):
+        """Restablece y reindexa el servicio de búsqueda de Windows."""
+        try:
+            return sys_optimizer.reindex_windows_search()
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
+    def get_compact_os_status(self):
+        """Consulta el estado actual de compresión Compact OS."""
+        try:
+            return sys_optimizer.get_compact_os_status()
+        except Exception as e:
+            return {"success": False, "is_compact": False, "raw_output": str(e)}
+
+    def toggle_compact_os(self, enable: bool):
+        """Activa o desactiva la compresión del sistema Compact OS."""
+        try:
+            return sys_optimizer.toggle_compact_os(enable=enable)
+        except Exception as e:
+            return {"success": False, "is_compact": False, "message": str(e)}
 
 
 def run_web_gui():

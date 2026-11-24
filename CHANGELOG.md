@@ -4,6 +4,35 @@ Todos los cambios notables en **PyClean Pro** se documentan en este archivo.
 
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto utiliza [Versionado Semántico](https://semver.org/lang/es/).
 
+## [2.8.0] - 2026-11-24
+
+### Añadido
+- **Motor de Limpieza Profunda (`cleaner.py`):**
+  - **4 Nuevas Categorías de Limpieza en Windows (24 categorías en total):**
+    - `gpu_driver_caches`: Carpetas de instaladores residuales de NVIDIA (`Downloader`, `C:\NVIDIA`) y AMD (`C:\AMD`), junto con cachés de sombreadores GPU (`DXCache`, `GLCache`).
+    - `directx_shaders`: Caché compilada de sombreadores gráficos DirectX y Direct3D (`D3DSCache`).
+    - `game_caches`: Descargas incompletas y datos temporales de Steam (`htmlcache`, `steamapps\downloading`), Epic Games Launcher (`webcache`, `Logs`) y Battle.net.
+    - `windows_recent_history`: Historial de accesos recientes y listas de salto del explorador (`Recent`, `AutomaticDestinations`, `CustomDestinations`).
+  - **5 Operaciones Especializadas de Mantenimiento y Limpieza Avanzada:**
+    - `run_dism_component_cleanup`: Limpieza profunda del almacén WinSxS con DISM (`/StartComponentCleanup` y `/ResetBase` opcional).
+    - `clean_vss_old_shadows`: Purga de instantáneas de sombra VSS antiguas conservando el punto de restauración más reciente.
+    - `clean_docker_system`: Poda y saneamiento multiplataforma de imágenes *dangling*, contenedores inactivos y caché de compilación de Docker (`docker system prune -f`).
+    - `find_stale_node_modules` y `delete_selected_node_modules`: Cazador y depurador seguro de carpetas `node_modules` en proyectos inactivos (>90 días) con validaciones estrictas contra symlinks y rutas críticas.
+- **Nuevo Módulo de Rendimiento y Tuning del Sistema (`sys_optimizer.py`):**
+  - `unlock_ultimate_performance_plan`: Desbloqueo y activación del plan oculto de energía *Ultimate Performance* (`e9a42b02-d5df-448d-aa00-03f14749eb61`).
+  - `tune_tcp_network`: Optimización de latencia y nivel de autotuning de la pila TCP de Windows mediante `netsh`.
+  - `reindex_windows_search`: Reparación y regeneración limpia del índice corrupto o inflado de Windows Search (`Windows.edb`).
+  - `get_compact_os_status` y `toggle_compact_os`: Consulta y conmutación de compresión transparente del sistema con CompactOS (`compact.exe /compactos`).
+- **Expansión de la API Web (`web_gui.py`):**
+  - 10 nuevos métodos integrados en la clase `PyCleanAPI` expuestos al frontend webview con validación de excepciones.
+- **Suite de Pruebas Automatizadas:**
+  - 41 nuevas pruebas unitarias y de integración en `tests/test_deep_cleaner.py`, `tests/test_sys_optimizer.py`, `tests/test_web_gui_optimization.py` y `tests/conftest.py`. Totalizando 151 pruebas pasando al 100%.
+
+### Cambiado
+- Actualizados metadatos de versión a `2.8.0` en `installer.iss`, `version_info.txt` y `README.md`.
+
+---
+
 ## [2.7.1] - 2026-11-20
 
 ### Añadido

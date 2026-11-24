@@ -1,4 +1,4 @@
-# ⚡ PyClean Pro v2.7.1
+# ⚡ PyClean Pro v2.8.0
 
 **Suite integral de escritorio para limpieza segura, análisis visual de disco, monitoreo de procesos y red, diagnóstico de hardware, privacidad y bóveda local de contraseñas cifrada (Windows y macOS).**
 
@@ -10,12 +10,12 @@ Construida en **Python 3.10+** con una interfaz moderna 100% offline impulsada p
 
 | Documento | Descripción |
 |---|---|
-| **[Guía de Usuario](docs/GUIA_USUARIO.md)** | Recorrido por las 13 vistas (4 grupos), temas Oscuro/OLED/Claro, categorías de limpieza (20 Windows / 9 macOS) e interfaz clásica `--legacy-gui`. |
+| **[Guía de Usuario](docs/GUIA_USUARIO.md)** | Recorrido por las 13 vistas (4 grupos), temas Oscuro/OLED/Claro, categorías de limpieza (24 Windows / 9 macOS) e interfaz clásica `--legacy-gui`. |
 | **[Referencia CLI](docs/CLI.md)** | Referencia exhaustiva de las 24 banderas de `main.py`, compatibilidad con `--json`/`--export` y recetas de automatización. |
 | **[Seguridad y Bóveda](docs/SEGURIDAD_Y_BOVEDA.md)** | Especificación criptográfica de `vault.py` (AES-256-GCM + PBKDF2-HMAC-SHA256 600k), salvaguardas de limpieza y modelo de amenazas. |
 | **[Arquitectura y Puente API](docs/ARQUITECTURA.md)** | Diagrama Mermaid de capas, 5 motores backend, frontend offline, referencia de los 56 métodos de `PyCleanAPI`, rutas por SO y suite de 21 tests. |
 | **[Compilación y Releases](docs/COMPILACION_Y_RELEASE.md)** | Compilación local Windows (`.exe`/Setup) y macOS (`.app`/`.dmg`), pipeline GitHub Actions, firma Authenticode y verificación `SHA256SUMS.txt`. |
-| **[Historial de Cambios](CHANGELOG.md)** | Registro cronológico de versiones desde `v2.0.0` hasta `v2.6.0`. |
+| **[Historial de Cambios](CHANGELOG.md)** | Registro cronológico de versiones desde `v2.0.0` hasta `v2.8.0`. |
 
 ---
 
@@ -24,7 +24,7 @@ Construida en **Python 3.10+** con una interfaz moderna 100% offline impulsada p
 | Módulo / Funcionalidad | Windows 10/11 | macOS | Linux (desde fuente) |
 |---|:---:|:---:|:---:|
 | **Instalador / Binario oficial en Releases** | ✅ `.exe` portable y `Setup.exe` | ✅ `.dmg` (`PyCleanPro.app`) | ⚙️ Solo código fuente |
-| **Limpieza inteligente por categorías** | ✅ 20 categorías (15 usuario / 5 Admin) | ✅ 9 categorías nativas | ⚠️ Parcial (solo rutas comunes) |
+| **Limpieza inteligente por categorías** | ✅ 24 categorías (18 usuario / 6 Admin) | ✅ 9 categorías nativas | ⚠️ Parcial (solo rutas comunes) |
 | **Mapa de Disco, Treemap y Archivos Gigantes** | ✅ Completo | ✅ Completo | ✅ Completo |
 | **Monitor de Procesos, Interfaces IPv4 y Ping** | ✅ Completo | ✅ Completo | ✅ Completo |
 | **Selector rápido de DNS y Vaciar DNS** | ✅ (`netsh` / `ipconfig`, Admin) | ❌ Solo Windows | ❌ Solo Windows |
@@ -37,13 +37,13 @@ Construida en **Python 3.10+** con una interfaz moderna 100% offline impulsada p
 
 ---
 
-## ✨ Resumen de Módulos (Interfaz v2.6.0)
+## ✨ Resumen de Módulos (Interfaz v2.8.0)
 
 La interfaz moderna organiza sus **13 vistas** en **4 grupos** de la barra lateral, con selector de tema (**Oscuro / OLED / Claro**), barra superior de acciones rápidas y consola de registro en vivo colapsable:
 
 ### 1. General
 - **Dashboard:** Medidores circulares SVG animados (GSAP) de disco y RAM, contador animado de espacio recuperable y desglose por categoría.
-- **Limpieza:** 20 categorías en Windows y 9 nativas en macOS con filtro de retención de 24 horas, protección contra enlaces simbólicos/*junctions*, lista blanca de exclusiones y aviso contextual de navegadores abiertos.
+- **Limpieza:** 24 categorías en Windows (incluyendo GPU NVIDIA/AMD, DirectX Shader cache, juegos e historial) y 9 nativas en macOS con filtro de retención de 24 horas, protección contra enlaces simbólicos/*junctions*, lista blanca de exclusiones y aviso contextual de navegadores abiertos.
 - **Archivos Top:** Listado de los 100 archivos basura más pesados detectados en el último escaneo con acceso directo al explorador de archivos.
 
 ### 2. Sistema y Hardware

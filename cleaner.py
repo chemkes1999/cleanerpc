@@ -16,6 +16,7 @@ import glob
 import time
 import json
 import logging
+import re
 from pathlib import Path
 
 # Configurar logger local
@@ -432,6 +433,9 @@ def get_target_categories() -> dict:
     user_temp = os.environ.get("TEMP", os.path.join(local_app_data, "Temp") if local_app_data else "")
     system_root = os.environ.get("SystemRoot", r"C:\Windows")
     user_home = str(Path.home())
+    program_data = os.environ.get("ProgramData", r"C:\ProgramData")
+    program_files_x86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+    system_drive = os.environ.get("SystemDrive", "C:")
 
     # Chromium multi-profile paths
     chrome_paths = _get_chromium_cache_paths(os.path.join(local_app_data, r"Google\Chrome\User Data"))
@@ -476,6 +480,38 @@ def get_target_categories() -> dict:
     # Componentes Web de Windows (INetCache)
     inet_paths = [
         os.path.join(local_app_data, r"Microsoft\Windows\INetCache")
+    ]
+
+    # Cachés de GPU (NVIDIA / AMD)
+    gpu_paths = [
+        os.path.join(program_data, r"NVIDIA Corporation\Downloader"),
+        os.path.join(system_drive + ("\\" if not system_drive.endswith(("\\", "/")) else ""), "NVIDIA"),
+        os.path.join(system_drive + ("\\" if not system_drive.endswith(("\\", "/")) else ""), "AMD"),
+        os.path.join(local_app_data, r"NVIDIA\DXCache"),
+        os.path.join(local_app_data, r"NVIDIA\GLCache"),
+        os.path.join(local_app_data, r"AMD\DxCache"),
+    ]
+
+    # Caché de Sombreadores DirectX (D3DSCache)
+    directx_paths = [
+        os.path.join(local_app_data, "D3DSCache"),
+    ]
+
+    # Cachés de Clientes de Juegos (Steam, Epic, Battle.net)
+    game_paths = [
+        os.path.join(local_app_data, r"Steam\htmlcache"),
+        os.path.join(program_files_x86, r"Steam\steamapps\downloading"),
+        os.path.join(local_app_data, r"EpicGamesLauncher\Saved\webcache"),
+        os.path.join(local_app_data, r"EpicGamesLauncher\Saved\Logs"),
+        os.path.join(local_app_data, r"Battle.net\Browser\Cache"),
+        os.path.join(local_app_data, r"Battle.net\Logs"),
+    ]
+
+    # Historial de accesos recientes de Windows
+    windows_recent_paths = [
+        os.path.join(app_data, r"Microsoft\Windows\Recent"),
+        os.path.join(app_data, r"Microsoft\Windows\Recent\AutomaticDestinations"),
+        os.path.join(app_data, r"Microsoft\Windows\Recent\CustomDestinations"),
     ]
 
     categories = {
@@ -646,6 +682,38 @@ def get_target_categories() -> dict:
             "desc": "Registros de precarga de aplicaciones antiguas",
             "requires_admin": True,
             "paths": [os.path.join(system_root, "Prefetch")],
+            "is_recycle_bin": False,
+            "supports_age_filter": False
+        },
+        "gpu_driver_caches": {
+            "name": "Instaladores y Cachés de GPU (NVIDIA / AMD)",
+            "desc": "Archivos residuales de instalación y cachés de sombreadores de NVIDIA y AMD",
+            "requires_admin": True,
+            "paths": [p for p in gpu_paths if p],
+            "is_recycle_bin": False,
+            "supports_age_filter": False
+        },
+        "directx_shaders": {
+            "name": "Caché de Sombreadores DirectX (D3DSCache)",
+            "desc": "Caché compilada de sombreadores gráficos DirectX y Direct3D",
+            "requires_admin": False,
+            "paths": [p for p in directx_paths if p],
+            "is_recycle_bin": False,
+            "supports_age_filter": False
+        },
+        "game_caches": {
+            "name": "Cachés de Clientes de Juegos (Steam, Epic, Battle.net)",
+            "desc": "Descargas incompletas y datos temporales de Steam, Epic Games Launcher y Battle.net",
+            "requires_admin": False,
+            "paths": [p for p in game_paths if p],
+            "is_recycle_bin": False,
+            "supports_age_filter": False
+        },
+        "windows_recent_history": {
+            "name": "Historial de Accesos Recientes de Windows",
+            "desc": "Archivos recientes, listas de salto del explorador y accesos directos obsoletos",
+            "requires_admin": False,
+            "paths": [p for p in windows_recent_paths if p],
             "is_recycle_bin": False,
             "supports_age_filter": False
         }
@@ -869,6 +937,322 @@ def clean_category(cat_key: str, cat_info: dict, min_age_hours: int = 24, exclus
                             pass
 
     return freed_bytes, deleted_count, skipped_count
+
+
+def run_dism_component_cleanup(reset_base: bool = False, on_progress=None) -> dict:
+    """
+    Ejecuta la limpieza del almacén de componentes WinSxS mediante DISM.
+    Requiere privilegios de Administrador en Windows.
+    """
+    if sys.platform != "win32" or not is_admin():
+        return {
+            "success": False,
+            "output": "",
+            "reset_base": reset_base,
+            "error": "Requiere privilegios de Administrador en Windows"
+        }
+
+    cmd = ["dism.exe", "/online", "/cleanup-image", "/startcomponentcleanup"]
+    if reset_base:
+        cmd.append("/resetbase")
+
+    startupinfo = None
+    if sys.platform == "win32" and hasattr(subprocess, "STARTUPINFO"):
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+    try:
+        if on_progress:
+            on_progress("Iniciando limpieza de componentes WinSxS con DISM...")
+
+        res = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=600,
+            startupinfo=startupinfo
+        )
+        success = (res.returncode == 0)
+        output = (res.stdout or "") + ("\n" + res.stderr if res.stderr else "")
+        output_str = output.strip()
+        error = None if success else (res.stderr.strip() or res.stdout.strip() or f"Código de salida: {res.returncode}")
+        return {
+            "success": success,
+            "output": output_str,
+            "reset_base": reset_base,
+            "error": error
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "output": "",
+            "reset_base": reset_base,
+            "error": "Tiempo de espera agotado al ejecutar DISM"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "output": "",
+            "reset_base": reset_base,
+            "error": str(e)
+        }
+
+
+def clean_vss_old_shadows() -> dict:
+    """
+    Elimina las instantáneas de restauración VSS más antiguas conservando las recientes.
+    Requiere privilegios de Administrador en Windows.
+    """
+    if sys.platform != "win32" or not is_admin():
+        return {
+            "success": False,
+            "output": "",
+            "error": "Requiere privilegios de Administrador en Windows"
+        }
+
+    cmd = ["vssadmin.exe", "delete", "shadows", "/for=C:", "/oldest", "/quiet"]
+    startupinfo = None
+    if sys.platform == "win32" and hasattr(subprocess, "STARTUPINFO"):
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+    try:
+        res = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=120,
+            startupinfo=startupinfo
+        )
+        output = (res.stdout or "") + ("\n" + res.stderr if res.stderr else "")
+        output_str = output.strip()
+        success = (res.returncode == 0) or ("No items found" in output_str or "No se encontraron" in output_str)
+        error = None if success else (res.stderr.strip() or res.stdout.strip() or f"Código de salida: {res.returncode}")
+        return {
+            "success": success,
+            "output": output_str,
+            "error": error
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "output": "",
+            "error": str(e)
+        }
+
+
+def clean_docker_system() -> dict:
+    """
+    Ejecuta docker system prune -f para liberar imágenes dangling,
+    contenedores detenidos y caché de build si Docker está instalado y activo.
+    """
+    if not shutil.which("docker"):
+        return {
+            "success": False,
+            "output": "",
+            "space_reclaimed": "0 B",
+            "error": "Docker no está instalado o no se encuentra en el PATH"
+        }
+
+    startupinfo = None
+    if sys.platform == "win32" and hasattr(subprocess, "STARTUPINFO"):
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+
+    try:
+        # Verificar que el demonio de Docker responda
+        info_res = subprocess.run(
+            ["docker", "info"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=15,
+            startupinfo=startupinfo
+        )
+        if info_res.returncode != 0:
+            return {
+                "success": False,
+                "output": "",
+                "space_reclaimed": "0 B",
+                "error": "El demonio de Docker no está en ejecución"
+            }
+
+        res = subprocess.run(
+            ["docker", "system", "prune", "-f"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=180,
+            startupinfo=startupinfo
+        )
+
+        stdout_text = res.stdout or ""
+        match = re.search(r"Total reclaimed space:\s*([^\r\n]+)", stdout_text, re.IGNORECASE)
+        space_reclaimed = match.group(1).strip() if match else "0 B"
+
+        success = (res.returncode == 0)
+        output = (stdout_text + ("\n" + res.stderr if res.stderr else "")).strip()
+        error = None if success else (res.stderr.strip() or stdout_text.strip() or f"Código de salida: {res.returncode}")
+
+        return {
+            "success": success,
+            "output": output,
+            "space_reclaimed": space_reclaimed,
+            "error": error
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "output": "",
+            "space_reclaimed": "0 B",
+            "error": str(e)
+        }
+
+
+def find_stale_node_modules(root_dir: str, inactive_days: int = 90) -> list[dict]:
+    """
+    Escanea root_dir recursivamente buscando directorios node_modules cuyos proyectos
+    no hayan tenido actividad reciente (según inactive_days).
+    Poda la recursión dentro de las carpetas node_modules encontradas.
+    """
+    if not root_dir or not os.path.exists(root_dir) or not os.path.isdir(root_dir):
+        return []
+
+    now = time.time()
+    results = []
+
+    try:
+        for root, dirs, files in os.walk(root_dir, topdown=True):
+            # Identificar si node_modules está en este nivel
+            node_modules_dirs = [d for d in dirs if d == "node_modules"]
+            # Podar la recursión para no explorar dentro de node_modules
+            dirs[:] = [d for d in dirs if d != "node_modules"]
+
+            for nm_name in node_modules_dirs:
+                nm_path = os.path.join(root, nm_name)
+                project_path = root
+                project_name = os.path.basename(project_path) or project_path
+
+                # Determinar última fecha de modificación del proyecto inspeccionando sus archivos (excluyendo node_modules)
+                max_mtime = 0.0
+                found_entries = False
+
+                try:
+                    for entry in os.scandir(project_path):
+                        if entry.name == "node_modules":
+                            continue
+                        found_entries = True
+                        try:
+                            st = entry.stat()
+                            if st.st_mtime > max_mtime:
+                                max_mtime = st.st_mtime
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+                # Si no se encontraron archivos específicos en el proyecto, recurrir a la fecha del directorio
+                if not found_entries or max_mtime <= 0:
+                    try:
+                        max_mtime = os.stat(project_path).st_mtime
+                    except Exception:
+                        max_mtime = now
+
+                days_inactive = int((now - max_mtime) / 86400) if now >= max_mtime else 0
+
+                if days_inactive >= inactive_days:
+                    size_bytes = 0
+                    try:
+                        for dirpath, _, filenames in os.walk(nm_path):
+                            for f in filenames:
+                                fp = os.path.join(dirpath, f)
+                                try:
+                                    if not os.path.islink(fp):
+                                        size_bytes += os.path.getsize(fp)
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
+
+                    results.append({
+                        "path": nm_path,
+                        "project_path": project_path,
+                        "project_name": project_name,
+                        "size_bytes": size_bytes,
+                        "size_formatted": format_size(size_bytes),
+                        "days_inactive": days_inactive,
+                        "last_modified": max_mtime
+                    })
+    except Exception as e:
+        logger.warning(f"Error al escanear node_modules en {root_dir}: {e}")
+
+    return results
+
+
+def delete_selected_node_modules(paths: list[str]) -> dict:
+    """
+    Elimina de forma segura las carpetas node_modules especificadas.
+    Verifica que el nombre base sea estrictamente 'node_modules' y no sea un enlace simbólico o junction.
+    """
+    deleted_count = 0
+    freed_bytes = 0
+    errors = []
+
+    for p in paths:
+        try:
+            if not p or not isinstance(p, str):
+                errors.append(f"Ruta inválida: {p}")
+                continue
+
+            norm_path = os.path.abspath(p)
+            base_name = os.path.basename(norm_path)
+
+            if base_name != "node_modules":
+                errors.append(f"Ruta rechazada (no es node_modules): {p}")
+                continue
+
+            if is_safe_link_or_junction(norm_path):
+                errors.append(f"Ruta rechazada (es enlace simbólico o junction): {p}")
+                continue
+
+            if not os.path.exists(norm_path) or not os.path.isdir(norm_path):
+                errors.append(f"Ruta no encontrada o no es directorio: {p}")
+                continue
+
+            # Calcular tamaño antes de eliminar
+            p_size = 0
+            for dirpath, _, filenames in os.walk(norm_path):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    try:
+                        if not os.path.islink(fp):
+                            p_size += os.path.getsize(fp)
+                    except Exception:
+                        pass
+
+            def _remove_readonly(func, path, excinfo):
+                try:
+                    import stat
+                    os.chmod(path, stat.S_IWRITE)
+                    func(path)
+                except Exception:
+                    pass
+
+            shutil.rmtree(norm_path, onerror=_remove_readonly)
+            deleted_count += 1
+            freed_bytes += p_size
+        except Exception as e:
+            errors.append(f"Error al eliminar {p}: {str(e)}")
+
+    return {
+        "success": len(errors) == 0,
+        "deleted_count": deleted_count,
+        "freed_bytes": freed_bytes,
+        "freed_formatted": format_size(freed_bytes),
+        "errors": errors
+    }
 
 
 def shred_file(file_path: str, passes: int = 1) -> tuple[bool, str]:
