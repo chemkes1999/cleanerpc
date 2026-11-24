@@ -66,6 +66,14 @@ def build_macos():
 
     print(f"[+] Bundle creado correctamente: {app_bundle}")
 
+    # Firma Ad-hoc profunda para evitar fallos de integridad en Apple Silicon (ARM64) e Intel
+    print(f"\n[+] Aplicando firma de código Ad-hoc a {app_bundle}...")
+    codesign_res = subprocess.run(["codesign", "--force", "--deep", "--sign", "-", app_bundle], check=False)
+    if codesign_res.returncode == 0:
+        print("[+] Firma Ad-hoc aplicada con éxito.")
+    else:
+        print("[!] Advertencia: codesign no completó con éxito (se continuará empaquetando).")
+
     # Preparar carpeta temporal para crear el .dmg con enlace a /Applications
     if os.path.exists(dmg_path):
         os.remove(dmg_path)
@@ -73,6 +81,8 @@ def build_macos():
     with tempfile.TemporaryDirectory(prefix="pyclean_dmg_") as staging_dir:
         staged_app = os.path.join(staging_dir, "PyCleanPro.app")
         shutil.copytree(app_bundle, staged_app, symlinks=True)
+        # Re-firmar en staging para asegurar sellado de symlinks
+        subprocess.run(["codesign", "--force", "--deep", "--sign", "-", staged_app], check=False)
         os.symlink("/Applications", os.path.join(staging_dir, "Applications"))
 
         hdiutil_cmd = [
