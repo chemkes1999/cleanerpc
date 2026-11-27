@@ -4,7 +4,7 @@
 ; =====================================================================
 
 #define MyAppName "PyClean Pro"
-#define MyAppVersion "2.8.0"
+#define MyAppVersion "2.9.0"
 #define MyAppPublisher "chemkes1999"
 #define MyAppURL "https://github.com/chemkes1999/cleanerpc"
 #define MyAppExeName "PyCleanPro.exe"
@@ -17,7 +17,7 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-VersionInfoVersion=2.8.0.0
+VersionInfoVersion=2.9.0.0
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription=Instalador oficial de {#MyAppName}
 VersionInfoProductName={#MyAppName}

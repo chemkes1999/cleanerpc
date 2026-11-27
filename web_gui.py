@@ -770,6 +770,27 @@ class PyCleanAPI:
     def get_battery_health(self):
         return hardware_health.get_battery_health()
 
+    def run_battery_energy_audit(self, duration_sec: int = 10):
+        return hardware_health.run_battery_energy_audit(duration_sec)
+
+    def optimize_battery_performance(self, profile: str = "autonomy"):
+        return hardware_health.optimize_battery_performance(profile)
+
+    def restore_battery_power_backup(self):
+        return hardware_health.restore_battery_power_backup()
+
+    def repair_battery_driver(self):
+        return hardware_health.repair_battery_driver()
+
+    def start_battery_calibration(self):
+        return hardware_health.start_battery_calibration()
+
+    def finish_battery_calibration(self):
+        return hardware_health.finish_battery_calibration()
+
+    def export_battery_report_html(self):
+        return hardware_health.export_battery_report_html()
+
     # --- v2.4: Gestor del Menú Contextual ---
     def get_context_menu_items(self):
         return context_menu.get_context_menu_items()

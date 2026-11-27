@@ -839,10 +839,76 @@
           </div>
 
           <div class="card" style="margin-top: 18px;">
-            <h3>Salud y Desgaste de Batería (Laptops)</h3>
-            <p class="setting-desc">Compara la capacidad original de fábrica contra la carga máxima actual.</p>
+            <div class="treemap-header">
+              <div>
+                <h3>Centro de Salud, Calibración y Rendimiento de Batería (Laptops)</h3>
+                <p class="setting-desc">Analiza desgaste real, detecta drenaje energético, calibra el medidor (BMS) y optimiza el rendimiento en batería y corriente.</p>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <button class="btn-tool" id="btn-battery-audit" style="padding: 6px 12px; font-size: 12px;">🔍 Auditoría de Drenaje (10s)</button>
+                <button class="btn-tool" id="btn-battery-export-html" style="padding: 6px 12px; font-size: 12px;">📄 Reporte Completo HTML</button>
+              </div>
+            </div>
+
             <div id="battery-health-panel" style="margin-top: 14px;">
               <div class="table-loading">Analizando sensor de batería...</div>
+            </div>
+
+            <!-- Centro de acciones reales de optimización y reparación -->
+            <div id="battery-tools-section" style="display: none; margin-top: 18px;">
+              <div class="battery-section-title">🛠️ Reparación y Optimización de Rendimiento</div>
+              <div class="battery-actions-grid">
+                <div class="battery-action-card">
+                  <div class="battery-action-head">
+                    <strong>🔋 Máxima Autonomía y Cuidado</strong>
+                    <span class="badge badge-dim">Reversible</span>
+                  </div>
+                  <p class="battery-action-desc">Reduce calor y picos de voltaje en batería (CPU 80%, ahorro USB/PCIe/Wi-Fi, economizador al 30%) manteniendo 100% enchufada.</p>
+                  <button class="btn-primary" id="btn-batt-opt-autonomy" style="padding: 6px 12px; font-size: 12px; width: 100%;">Aplicar Perfil Autonomía</button>
+                </div>
+
+                <div class="battery-action-card">
+                  <div class="battery-action-head">
+                    <strong>⚡ Rendimiento Estable (Sin Lag)</strong>
+                    <span class="badge badge-dim">Reversible</span>
+                  </div>
+                  <p class="battery-action-desc">Elimina caídas de FPS y throttling energético al estar enchufada (PCIe/Wi-Fi sin ahorro) con respuesta fluida en batería.</p>
+                  <button class="btn-primary" id="btn-batt-opt-performance" style="padding: 6px 12px; font-size: 12px; width: 100%;">Aplicar Perfil Rendimiento</button>
+                </div>
+
+                <div class="battery-action-card">
+                  <div class="battery-action-head">
+                    <strong>🔧 Reparar Driver ACPI y Esquemas</strong>
+                    <span class="badge badge-dim">Admin</span>
+                  </div>
+                  <p class="battery-action-desc">Reinicia el controlador ACPI de batería (corrige % congelado o errores de carga) o restaura planes de energía corruptos.</p>
+                  <div style="display: flex; gap: 6px;">
+                    <button class="btn-tool" id="btn-batt-repair-driver" style="padding: 6px 10px; font-size: 11px; flex: 1;">Reiniciar Driver</button>
+                    <button class="btn-tool" id="btn-batt-repair-schemes" style="padding: 6px 10px; font-size: 11px; flex: 1;">Restaurar Planes</button>
+                  </div>
+                </div>
+
+                <div class="battery-action-card">
+                  <div class="battery-action-head">
+                    <strong>🎯 Calibrar Medidor (BMS)</strong>
+                    <span class="badge badge-dim">Guiado</span>
+                  </div>
+                  <p class="battery-action-desc">Pausa la suspensión temporalmente para hacer 1 ciclo completo y recalibrar la capacidad real reportada por la batería.</p>
+                  <div style="display: flex; gap: 6px;">
+                    <button class="btn-tool" id="btn-batt-calib-start" style="padding: 6px 10px; font-size: 11px; flex: 1;">Iniciar Calibración</button>
+                    <button class="btn-primary" id="btn-batt-calib-finish" style="padding: 6px 10px; font-size: 11px; flex: 1; display: none;">Finalizar y Comparar</button>
+                  </div>
+                </div>
+              </div>
+
+              <div id="battery-calibration-banner" class="battery-calib-banner" style="display: none; margin-top: 12px;"></div>
+
+              <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap;">
+                <div class="tool-status-box" id="battery-action-status" style="flex: 1; margin: 0;">Listo para analizar u optimizar la batería y el rendimiento energético.</div>
+                <button class="btn-tool" id="btn-batt-restore-backup" style="display: none; padding: 8px 12px; font-size: 12px;">↩️ Restaurar Perfil Anterior</button>
+              </div>
+
+              <div id="battery-audit-results" style="display: none; margin-top: 14px;"></div>
             </div>
           </div>
         </section>

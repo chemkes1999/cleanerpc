@@ -76,11 +76,11 @@ def build_macos():
     plist_file = os.path.join(app_bundle, "Contents", "Info.plist")
     if os.path.exists(plist_file):
         try:
-            print("[+] Configurando Info.plist con metadatos v2.8.0...")
+            print("[+] Configurando Info.plist con metadatos v2.9.0...")
             with open(plist_file, "rb") as f:
                 pl = plistlib.load(f)
-            pl["CFBundleShortVersionString"] = "2.8.0"
-            pl["CFBundleVersion"] = "2.8.0"
+            pl["CFBundleShortVersionString"] = "2.9.0"
+            pl["CFBundleVersion"] = "2.9.0"
             pl["CFBundleDisplayName"] = "PyClean Pro"
             pl["NSHumanReadableCopyright"] = "Copyright © 2026 chemkes1999. Open Source."
             pl["NSHighResolutionCapable"] = True
@@ -162,7 +162,7 @@ echo "Listo. Puedes cerrar esta ventana."
         readme_dmg = os.path.join(staging_dir, "Instrucciones de Instalación.txt")
         with open(readme_dmg, "w", encoding="utf-8") as f:
             f.write(
-                "⚡ PyClean Pro v2.8.0 para macOS\n\n"
+                "⚡ PyClean Pro v2.9.0 para macOS\n\n"
                 "Instalación:\n"
                 "1. Arrastra 'PyCleanPro.app' a la carpeta 'Applications'.\n"
                 "2. Si macOS Gatekeeper bloquea la apertura indicando desarrollador no identificado:\n"

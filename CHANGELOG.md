@@ -4,6 +4,27 @@ Todos los cambios notables en **PyClean Pro** se documentan en este archivo.
 
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y el proyecto utiliza [Versionado Semántico](https://semver.org/lang/es/).
 
+## [2.9.0] - 2026-11-27
+
+### Añadido
+- **Centro de Salud, Calibración y Rendimiento de Batería (`hardware_health.py`, `web_gui.py`, `web/`):**
+  - **Análisis Profundo y Telemetría en Vivo:** Lectura de voltaje y consumo/carga en Watts vía WMI (`root\WMI`), tiempo restante estimado, plan de energía activo, química/fabricante de celdas, historial reciente de degradación (`capacity_history`) y detección clara cuando el BIOS no reporta contador de ciclos.
+  - **Diagnóstico Inteligente y Límite de Carga OEM:** Evaluación automática del desgaste real con recomendaciones accionables y guía específica por fabricante (Lenovo, ASUS, Dell, HP, Acer, MSI, Samsung, LG, Huawei) para activar el límite de carga al 80%.
+  - **Auditoría de Drenaje Energético (`run_battery_energy_audit`):** Ejecuta `powercfg /energy /duration 10 /xml` para identificar errores y advertencias de eficiencia energética en Windows junto a los procesos de mayor impacto en CPU/RAM.
+  - **Perfiles Reversibles de Optimización (`optimize_battery_performance` y `restore_battery_power_backup`):**
+    - *Máxima Autonomía y Cuidado:* Reduce calor y picos de voltaje en batería (CPU 80% DC, ahorro USB/PCIe/Wi-Fi, economizador al 30%) manteniendo 100% enchufada.
+    - *Rendimiento Estable:* Elimina lag/throttling energético enchufada con respuesta fluida en batería.
+    - *Restaurar Planes:* Repara esquemas de energía corruptos (`powercfg /restoredefaultschemes`).
+  - **Reparación del Driver ACPI (`repair_battery_driver`):** Reinicio seguro del controlador `Microsoft ACPI-Compliant Control Method Battery` (`PNP0C0A`) y reescaneo PnP para porcentajes congelados o errores de lectura.
+  - **Asistente Guiado de Calibración BMS (`start_battery_calibration` y `finish_battery_calibration`):** Prepara tiempos de suspensión seguros con hibernación al 5%, guarda línea base y compara la capacidad real antes vs. después.
+  - **Exportación de Reporte Oficial HTML (`export_battery_report_html`):** Genera y abre el reporte oficial completo de Windows.
+- **Pruebas Unitarias:** Nueva suite `tests/test_battery_center.py` con 6 pruebas para parseo XML, auditoría de energía, diagnóstico OEM, perfiles `powercfg`, reparación ACPI y ciclo completo de calibración.
+
+### Cambiado
+- Actualizados metadatos de versión a `2.9.0` en `version_info.txt`, `installer.iss`, `build_macos.py` y `README.md`.
+
+---
+
 ## [2.8.0] - 2026-11-24
 
 ### Añadido

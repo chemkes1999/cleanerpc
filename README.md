@@ -1,4 +1,4 @@
-# ⚡ PyClean Pro v2.8.0
+# ⚡ PyClean Pro v2.9.0
 
 **Suite integral de escritorio para limpieza segura, análisis visual de disco, monitoreo de procesos y red, diagnóstico de hardware, privacidad y bóveda local de contraseñas cifrada (Windows y macOS).**
 
@@ -15,7 +15,7 @@ Construida en **Python 3.10+** con una interfaz moderna 100% offline impulsada p
 | **[Seguridad y Bóveda](docs/SEGURIDAD_Y_BOVEDA.md)** | Especificación criptográfica de `vault.py` (AES-256-GCM + PBKDF2-HMAC-SHA256 600k), salvaguardas de limpieza y modelo de amenazas. |
 | **[Arquitectura y Puente API](docs/ARQUITECTURA.md)** | Diagrama Mermaid de capas, 5 motores backend, frontend offline, referencia de los 56 métodos de `PyCleanAPI`, rutas por SO y suite de 21 tests. |
 | **[Compilación y Releases](docs/COMPILACION_Y_RELEASE.md)** | Compilación local Windows (`.exe`/Setup) y macOS (`.app`/`.dmg`), pipeline GitHub Actions, firma Authenticode y verificación `SHA256SUMS.txt`. |
-| **[Historial de Cambios](CHANGELOG.md)** | Registro cronológico de versiones desde `v2.0.0` hasta `v2.8.0`. |
+| **[Historial de Cambios](CHANGELOG.md)** | Registro cronológico de versiones desde `v2.0.0` hasta `v2.9.0`. |
 
 ---
 
@@ -37,7 +37,7 @@ Construida en **Python 3.10+** con una interfaz moderna 100% offline impulsada p
 
 ---
 
-## ✨ Resumen de Módulos (Interfaz v2.8.0)
+## ✨ Resumen de Módulos (Interfaz v2.9.0)
 
 La interfaz moderna organiza sus **13 vistas** en **4 grupos** de la barra lateral, con selector de tema (**Oscuro / OLED / Claro**), barra superior de acciones rápidas y consola de registro en vivo colapsable:
 

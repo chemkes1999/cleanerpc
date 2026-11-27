@@ -232,8 +232,105 @@ async function loadDiskHealthUI() {
   }
 }
 
+function renderBatteryCalibrationBanner(calibState) {
+  const banner = document.getElementById("battery-calibration-banner");
+  const btnStart = document.getElementById("btn-batt-calib-start");
+  const btnFinish = document.getElementById("btn-batt-calib-finish");
+  if (!banner) return;
+
+  if (calibState && calibState.active) {
+    const baseMwh = calibState.baseline_full_charge_mwh || 0;
+    const baseHealth = calibState.baseline_health_percent !== null && calibState.baseline_health_percent !== undefined
+      ? `${calibState.baseline_health_percent}%`
+      : "N/A";
+    const stepsHtml = (calibState.steps || [])
+      .map(s => `<li>${v24Escape(s.replace(/^\d+\.\s*/, ""))}</li>`)
+      .join("");
+
+    banner.innerHTML = `
+      <div><strong>🎯 Sesión de calibración activa</strong> (Base inicial: <strong>${baseMwh} mWh</strong> • Salud: <strong>${baseHealth}</strong>)</div>
+      <ol>${stepsHtml}</ol>
+    `;
+    banner.style.display = "block";
+    if (btnStart) btnStart.style.display = "none";
+    if (btnFinish) btnFinish.style.display = "inline-block";
+  } else {
+    banner.style.display = "none";
+    banner.innerHTML = "";
+    if (btnStart) btnStart.style.display = "inline-block";
+    if (btnFinish) btnFinish.style.display = "none";
+  }
+}
+
+function renderBatteryAuditResults(audit) {
+  const container = document.getElementById("battery-audit-results");
+  if (!container) return;
+
+  const findings = audit.findings || [];
+  const topProcs = audit.top_processes || [];
+
+  let findingsHtml = "";
+  if (audit.success && findings.length === 0) {
+    findingsHtml = `<div style="color: var(--success); margin-top: 6px;">✅ No se detectaron errores ni advertencias críticas de eficiencia energética.</div>`;
+  } else if (findings.length > 0) {
+    findingsHtml = findings.map(f => `
+      <div class="battery-finding-item ${f.severity === "error" ? "sev-error" : ""}">
+        <div style="font-weight: 600; color: var(--text-main);">
+          ${f.severity === "error" ? "🔴" : "🟡"} ${v24Escape(f.name)}
+        </div>
+        ${f.description ? `<div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${v24Escape(f.description)}</div>` : ""}
+      </div>
+    `).join("");
+  } else {
+    findingsHtml = `<div style="color: var(--warning); margin-top: 6px;">${v24Escape(audit.message || "Sin datos del reporte de energía.")}</div>`;
+  }
+
+  let procsHtml = "";
+  if (topProcs.length > 0) {
+    procsHtml = topProcs.map(p => `
+      <div class="ping-row" style="margin-top: 6px; padding: 6px 10px; font-size: 12px;">
+        <span><strong>${v24Escape(p.name)}</strong> <span style="color: var(--text-dim);">(PID ${p.pid})</span></span>
+        <span>CPU: <strong style="color: var(--warning);">${p.cpu_percent}%</strong> • RAM: ${v24Escape(p.memory_formatted)}</span>
+      </div>
+    `).join("");
+  } else {
+    procsHtml = `<div style="color: var(--text-muted); margin-top: 6px;">Sin procesos con consumo elevado detectado en este instante.</div>`;
+  }
+
+  container.innerHTML = `
+    <div class="battery-audit-grid">
+      <div class="battery-audit-panel">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <strong>📋 Auditoría de Energía de Windows</strong>
+          <span style="font-size: 11px; color: var(--text-muted);">
+            Errores: <strong style="color:var(--danger);">${audit.errors_count || 0}</strong> • Advertencias: <strong style="color:var(--warning);">${audit.warnings_count || 0}</strong>
+          </span>
+        </div>
+        <div style="max-height: 220px; overflow-y: auto; margin-top: 4px;">${findingsHtml}</div>
+      </div>
+      <div class="battery-audit-panel">
+        <strong>🔥 Procesos con Mayor Impacto Actual</strong>
+        <div style="max-height: 220px; overflow-y: auto; margin-top: 4px;">${procsHtml}</div>
+      </div>
+    </div>
+  `;
+  container.style.display = "block";
+}
+
+function setBatteryActionStatus(msg, level = "info") {
+  const box = document.getElementById("battery-action-status");
+  if (!box) return;
+  box.textContent = msg;
+  if (level === "success") box.style.color = "var(--success)";
+  else if (level === "error") box.style.color = "var(--danger)";
+  else if (level === "warning") box.style.color = "var(--warning)";
+  else box.style.color = "var(--text-main)";
+}
+
 async function loadBatteryHealthUI() {
   const panel = document.getElementById("battery-health-panel");
+  const toolsSec = document.getElementById("battery-tools-section");
+  const btnRestore = document.getElementById("btn-batt-restore-backup");
   if (!panel) return;
 
   try {
@@ -244,30 +341,90 @@ async function loadBatteryHealthUI() {
 
     if (!batt || !batt.has_battery) {
       panel.innerHTML = `<div class="tool-status-box">🖥️ Equipo de escritorio detectado (no cuenta con batería interna).</div>`;
+      if (toolsSec) toolsSec.style.display = "none";
       return;
     }
 
+    if (toolsSec) toolsSec.style.display = "block";
+    if (btnRestore) btnRestore.style.display = batt.has_power_backup ? "inline-block" : "none";
+    renderBatteryCalibrationBanner(batt.calibration_state);
+
     const healthPct = batt.health_percent !== null && batt.health_percent !== undefined ? batt.health_percent : null;
     const healthColor = healthPct === null ? "var(--primary)" : healthPct >= 80 ? "var(--success)" : healthPct >= 60 ? "var(--warning)" : "var(--danger)";
+    const cycleLabel = batt.cycle_count_reported
+      ? `Ciclos de carga: ${batt.cycle_count}`
+      : "Ciclos: No reportado por BIOS";
+    const chemInfo = [batt.chemistry, batt.manufacturer].filter(Boolean).join(" • ");
+
+    let telemetryVal = batt.active_power_plan && batt.active_power_plan.name
+      ? batt.active_power_plan.name
+      : "Estándar";
+    let telemetrySubParts = [];
+    if (batt.power_draw_watts) {
+      telemetrySubParts.push(`${batt.power_plugged ? "Carga" : "Consumo"}: ${batt.power_draw_watts} W`);
+    }
+    if (batt.voltage_mv) {
+      telemetrySubParts.push(`${(batt.voltage_mv / 1000).toFixed(2)} V`);
+    }
+    const telemetrySub = telemetrySubParts.length > 0 ? telemetrySubParts.join(" • ") : (chemInfo || "Sensor ACPI activo");
+
+    const diag = batt.diagnosis || {};
+    const diagLevel = diag.level || "unknown";
+    const recsHtml = (diag.recommendations || []).length > 0
+      ? `<ul class="battery-diagnosis-recs">${diag.recommendations.map(r => `<li>${v24Escape(r)}</li>`).join("")}</ul>`
+      : "";
+
+    let historyHtml = "";
+    if (Array.isArray(batt.capacity_history) && batt.capacity_history.length >= 2) {
+      const items = batt.capacity_history.slice(-6).map(h => `
+        <div class="battery-history-item">
+          <span style="color: var(--text-dim);">${v24Escape(h.date)}</span>
+          <strong style="color: var(--text-main);">${h.health_percent}%</strong>
+          <span style="color: var(--text-muted);">${h.full_charge_mwh} mWh</span>
+        </div>
+      `).join("");
+      historyHtml = `
+        <div class="battery-history-strip">
+          <div style="font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase;">📈 Historial Reciente de Capacidad Real</div>
+          <div class="battery-history-list">${items}</div>
+        </div>
+      `;
+    }
 
     panel.innerHTML = `
       <div class="battery-stats-grid">
         <div class="battery-stat-box">
           <span class="battery-stat-label">Carga Actual</span>
           <strong class="battery-stat-value">${batt.percent ?? 0}%</strong>
-          <span class="battery-stat-sub">${batt.power_plugged ? "⚡ Conectado a corriente" : "🔋 Usando batería"}</span>
+          <span class="battery-stat-sub">${batt.power_plugged ? "⚡ Conectado a corriente" : `🔋 En batería • ${v24Escape(batt.time_remaining_formatted || "Calculando...")}`}</span>
         </div>
         <div class="battery-stat-box">
           <span class="battery-stat-label">Salud Real</span>
           <strong class="battery-stat-value" style="color:${healthColor};">${healthPct !== null ? healthPct + "%" : "N/A"}</strong>
           <span class="battery-stat-sub">${batt.wear_percent !== null && batt.wear_percent !== undefined ? `Desgaste: ${batt.wear_percent}%` : "Sin reporte XML"}</span>
+          ${healthPct !== null ? `<div class="battery-health-bar"><div class="battery-health-bar-fill" style="width:${Math.max(4, Math.min(100, healthPct))}%; background:${healthColor};"></div></div>` : ""}
         </div>
         <div class="battery-stat-box">
           <span class="battery-stat-label">Capacidad (Actual / Diseño)</span>
           <strong class="battery-stat-value" style="font-size: 16px;">${batt.full_charge_capacity_mwh || 0} / ${batt.design_capacity_mwh || 0} mWh</strong>
-          <span class="battery-stat-sub">Ciclos de carga: ${batt.cycle_count || 0}</span>
+          <span class="battery-stat-sub">${v24Escape(cycleLabel)}${chemInfo ? ` • ${v24Escape(chemInfo)}` : ""}</span>
+        </div>
+        <div class="battery-stat-box">
+          <span class="battery-stat-label">Plan Activo &amp; Telemetría</span>
+          <strong class="battery-stat-value" style="font-size: 15px;">${v24Escape(telemetryVal)}</strong>
+          <span class="battery-stat-sub">${v24Escape(telemetrySub)}</span>
         </div>
       </div>
+
+      ${diag.title ? `
+        <div class="battery-diagnosis-box diag-${v24Escape(diagLevel)}">
+          <div class="battery-diagnosis-title">🩺 Diagnóstico: ${v24Escape(diag.title)}</div>
+          <div style="color: var(--text-main);">${v24Escape(diag.summary || "")}</div>
+          ${recsHtml}
+        </div>
+      ` : ""}
+
+      ${historyHtml}
     `;
   } catch (err) {
     panel.innerHTML = `<div class="tool-status-box" style="color: var(--danger);">Error analizando batería: ${v24Escape(err)}</div>`;
@@ -903,6 +1060,160 @@ function initV24Modules() {
         if (statusBox) statusBox.textContent = `Error: ${err}`;
       } finally {
         btnTrim.disabled = false;
+      }
+    });
+  }
+
+  // --- Centro de Batería (Auditoría, Optimización, Reparación y Calibración) ---
+  const btnBattAudit = document.getElementById("btn-battery-audit");
+  if (btnBattAudit) {
+    btnBattAudit.addEventListener("click", async () => {
+      if (!window.pywebview) return;
+      btnBattAudit.disabled = true;
+      setBatteryActionStatus("Ejecutando auditoría de eficiencia energética de Windows (10 segundos)...", "info");
+      v24Log("Iniciando auditoría de drenaje de batería (powercfg /energy)...", "info");
+      try {
+        const res = await window.pywebview.api.run_battery_energy_audit(10);
+        renderBatteryAuditResults(res);
+        setBatteryActionStatus(res.message, res.success ? "success" : "warning");
+        v24Log(res.message, res.success ? "success" : "warning");
+      } catch (err) {
+        setBatteryActionStatus(`Error en auditoría: ${err}`, "error");
+      } finally {
+        btnBattAudit.disabled = false;
+      }
+    });
+  }
+
+  const btnBattExportHtml = document.getElementById("btn-battery-export-html");
+  if (btnBattExportHtml) {
+    btnBattExportHtml.addEventListener("click", async () => {
+      if (!window.pywebview) return;
+      btnBattExportHtml.disabled = true;
+      setBatteryActionStatus("Generando reporte oficial HTML de batería...", "info");
+      try {
+        const res = await window.pywebview.api.export_battery_report_html();
+        setBatteryActionStatus(res.message, res.success ? "success" : "warning");
+        v24Log(res.message, res.success ? "success" : "warning");
+      } catch (err) {
+        setBatteryActionStatus(`Error exportando reporte: ${err}`, "error");
+      } finally {
+        btnBattExportHtml.disabled = false;
+      }
+    });
+  }
+
+  const bindBatteryProfileBtn = (btnId, profile, runningLabel) => {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.addEventListener("click", async () => {
+      if (!window.pywebview) return;
+      btn.disabled = true;
+      setBatteryActionStatus(runningLabel, "info");
+      v24Log(runningLabel, "info");
+      try {
+        const res = await window.pywebview.api.optimize_battery_performance(profile);
+        setBatteryActionStatus(res.message, res.success ? "success" : "warning");
+        v24Log(res.message, res.success ? "success" : "warning");
+        await loadBatteryHealthUI();
+      } catch (err) {
+        setBatteryActionStatus(`Error aplicando perfil: ${err}`, "error");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  };
+
+  bindBatteryProfileBtn(
+    "btn-batt-opt-autonomy",
+    "autonomy",
+    "Aplicando perfil de Máxima Autonomía y Cuidado de Batería..."
+  );
+  bindBatteryProfileBtn(
+    "btn-batt-opt-performance",
+    "performance",
+    "Aplicando perfil de Rendimiento Estable sin throttling..."
+  );
+  bindBatteryProfileBtn(
+    "btn-batt-repair-schemes",
+    "repair_schemes",
+    "Restaurando esquemas de energía por defecto de Windows..."
+  );
+
+  const btnBattRepairDriver = document.getElementById("btn-batt-repair-driver");
+  if (btnBattRepairDriver) {
+    btnBattRepairDriver.addEventListener("click", async () => {
+      if (!window.pywebview) return;
+      if (!confirm("Se reiniciará temporalmente el controlador ACPI de batería (toma ~3 segundos). ¿Continuar?")) return;
+      btnBattRepairDriver.disabled = true;
+      setBatteryActionStatus("Reiniciando controlador ACPI de batería y reescaneando hardware...", "info");
+      v24Log("Reparando controlador ACPI de batería...", "info");
+      try {
+        const res = await window.pywebview.api.repair_battery_driver();
+        setBatteryActionStatus(res.message, res.success ? "success" : "warning");
+        v24Log(res.message, res.success ? "success" : "warning");
+        await loadBatteryHealthUI();
+      } catch (err) {
+        setBatteryActionStatus(`Error reparando driver ACPI: ${err}`, "error");
+      } finally {
+        btnBattRepairDriver.disabled = false;
+      }
+    });
+  }
+
+  const btnBattCalibStart = document.getElementById("btn-batt-calib-start");
+  if (btnBattCalibStart) {
+    btnBattCalibStart.addEventListener("click", async () => {
+      if (!window.pywebview) return;
+      btnBattCalibStart.disabled = true;
+      setBatteryActionStatus("Preparando plan de energía para calibración segura de batería...", "info");
+      try {
+        const res = await window.pywebview.api.start_battery_calibration();
+        setBatteryActionStatus(res.message, res.success ? "success" : "warning");
+        v24Log(res.message, res.success ? "success" : "warning");
+        await loadBatteryHealthUI();
+      } catch (err) {
+        setBatteryActionStatus(`Error iniciando calibración: ${err}`, "error");
+      } finally {
+        btnBattCalibStart.disabled = false;
+      }
+    });
+  }
+
+  const btnBattCalibFinish = document.getElementById("btn-batt-calib-finish");
+  if (btnBattCalibFinish) {
+    btnBattCalibFinish.addEventListener("click", async () => {
+      if (!window.pywebview) return;
+      btnBattCalibFinish.disabled = true;
+      setBatteryActionStatus("Finalizando calibración, restaurando energía y comparando salud...", "info");
+      try {
+        const res = await window.pywebview.api.finish_battery_calibration();
+        setBatteryActionStatus(res.message, res.success ? "success" : "warning");
+        v24Log(res.message, res.success ? "success" : "warning");
+        await loadBatteryHealthUI();
+      } catch (err) {
+        setBatteryActionStatus(`Error finalizando calibración: ${err}`, "error");
+      } finally {
+        btnBattCalibFinish.disabled = false;
+      }
+    });
+  }
+
+  const btnBattRestore = document.getElementById("btn-batt-restore-backup");
+  if (btnBattRestore) {
+    btnBattRestore.addEventListener("click", async () => {
+      if (!window.pywebview) return;
+      btnBattRestore.disabled = true;
+      setBatteryActionStatus("Restaurando configuración previa de energía...", "info");
+      try {
+        const res = await window.pywebview.api.restore_battery_power_backup();
+        setBatteryActionStatus(res.message, res.success ? "success" : "warning");
+        v24Log(res.message, res.success ? "success" : "warning");
+        await loadBatteryHealthUI();
+      } catch (err) {
+        setBatteryActionStatus(`Error restaurando respaldo: ${err}`, "error");
+      } finally {
+        btnBattRestore.disabled = false;
       }
     });
   }
